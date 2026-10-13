@@ -1,0 +1,366 @@
+// Lógica del juego de las sillas, sin nada de pantalla: se puede probar sola.
+// Todo avanza con `actualizar(ahora, dt)`; no usa setTimeout, así es predecible.
+import type { AvatarAnim, AvatarConfig, DanceId } from '@/avatar/types';
+import { elegirBots } from '@/data/bots';
+import { paso as datosPaso } from '@/data/catalogo';
+
+export type Fase = 'cuenta' | 'musica' | 'alto' | 'resultado' | 'fin';
+export type Dificultad = 'Fácil' | 'Normal' | 'Difícil';
+export type Evento = 'cuenta' | 'musica' | 'alto' | 'sentado' | 'paso' | 'fuera' | 'ganaste' | 'fin';
+
+export interface Jugador {
+  id: number;
+  nombre: string;
+  tu: boolean;
+  vivo: boolean;
+  avatar: AvatarConfig;
+}
+
+export interface Reclamo {
+  silla: number;
+  t0: number;
+  desde: [number, number];
+}
+
+export interface Opciones {
+  jugadores: number; // 3 a 8, contándote a ti
+  dificultad: Dificultad;
+  tuNombre: string;
+  tuAvatar: AvatarConfig;
+  favoritos: (DanceId | null)[];
+  random?: () => number;
+}
+
+export interface Geometria {
+  sillas: [number, number][];
+  pos: Record<number, [number, number]>;
+  orbita: Record<number, [number, number]>;
+  N: number;
+  C: number;
+}
+
+// Medidas de la pista (metros): los jugadores giran en un círculo de 2 m alrededor de las sillas.
+export const RADIO_ORBITA = 2;
+const radioSillas = (C: number) => (C === 1 ? 0 : C === 2 ? 0.74 : 1.185);
+const PUNTOS_RONDA = 20;
+const PUNTOS_GANAR = 100;
+const PUNTOS_PASO = 5;
+
+const RANGO_BOTS: Record<Dificultad, [number, number]> = {
+  Fácil: [650, 1500],
+  Normal: [420, 1050],
+  Difícil: [230, 700],
+};
+
+export class Juego {
+  fase: Fase = 'cuenta';
+  cuenta = 3;
+  ronda = 0;
+  jugadores: Jugador[] = [];
+  enRonda: number[] = [];
+  reclamos: Record<number, Reclamo> = {};
+  theta = 0;
+  andar = 0;
+  pts = 0;
+  pasosBailados = 0;
+  rondasSobrevividas = 0;
+  gano = false;
+  puesto = 0;
+  total = 0;
+  ganadorId: number | null = null;
+  ganador = '';
+  finEn = 0;
+  espectando = false;
+  ultimoFuera = '';
+  baile: DanceId | null = null;
+  baileHasta = 0;
+  flash = '';
+  flashHasta = 0;
+  /** Sube con cada cambio importante (para que la pantalla sepa cuándo redibujar). */
+  version = 0;
+
+  private opts: Opciones;
+  private rnd: () => number;
+  private agenda: { en: number; fn: (ahora: number) => void }[] = [];
+  private oyentes: ((e: Evento) => void)[] = [];
+
+  constructor(opts: Opciones) {
+    this.opts = opts;
+    this.rnd = opts.random ?? Math.random;
+    this.armarJugadores();
+  }
+
+  get favoritos() {
+    return this.opts.favoritos;
+  }
+  get tu() {
+    return this.jugadores.find((p) => p.tu)!;
+  }
+
+  on(fn: (e: Evento) => void) {
+    this.oyentes.push(fn);
+    return () => {
+      this.oyentes = this.oyentes.filter((f) => f !== fn);
+    };
+  }
+  private emitir(e: Evento) {
+    this.version++;
+    this.oyentes.forEach((f) => f(e));
+  }
+  // lo agendado recibe la hora real en que se ejecuta (si un cuadro tarda, nada se encima)
+  private en(ahora: number, ms: number, fn: (ahora: number) => void) {
+    this.agenda.push({ en: ahora + ms, fn });
+  }
+  private limpiarAgenda() {
+    this.agenda = [];
+  }
+
+  private armarJugadores() {
+    const n = Math.max(3, Math.min(8, Math.round(this.opts.jugadores)));
+    const bots = elegirBots(n - 1, this.rnd);
+    this.jugadores = [
+      { id: 0, nombre: this.opts.tuNombre || 'Tú', tu: true, vivo: true, avatar: this.opts.tuAvatar },
+      ...bots.map((b, i) => ({ id: i + 1, nombre: b.nombre, tu: false, vivo: true, avatar: b })),
+    ];
+    this.enRonda = this.jugadores.map((p) => p.id);
+    this.reclamos = {};
+    this.total = this.jugadores.length;
+  }
+
+  /** Cuenta regresiva 3, 2, 1 y empieza la partida. */
+  iniciar(ahora: number) {
+    this.limpiarAgenda();
+    this.armarJugadores();
+    this.fase = 'cuenta';
+    this.cuenta = 3;
+    this.ronda = 0;
+    this.pts = 0;
+    this.pasosBailados = 0;
+    this.rondasSobrevividas = 0;
+    this.gano = false;
+    this.espectando = false;
+    this.ganadorId = null;
+    this.ganador = '';
+    this.ultimoFuera = '';
+    const tic = (t: number) => {
+      if (this.fase !== 'cuenta') return;
+      this.cuenta -= 1;
+      if (this.cuenta <= 0) this.empezarRonda(t, 1);
+      else {
+        this.emitir('cuenta');
+        this.en(t, 800, tic);
+      }
+    };
+    this.emitir('cuenta');
+    this.en(ahora, 800, tic);
+  }
+
+  private empezarRonda(ahora: number, ronda: number) {
+    this.ronda = ronda;
+    this.reclamos = {};
+    this.enRonda = this.jugadores.filter((p) => p.vivo).map((p) => p.id);
+    this.fase = 'musica';
+    this.baileHasta = 0;
+    this.flashHasta = 0;
+    const dura = 3000 + this.rnd() * 5500;
+    this.en(ahora, dura, (t) => this.pararMusica(t));
+    this.emitir('musica');
+  }
+
+  /** Velocidad de giro (rad/ms): un poco más rápido cada ronda. */
+  velocidad() {
+    return 0.0011 * (1 + (Math.max(1, this.ronda) - 1) * 0.08);
+  }
+
+  private pararMusica(ahora: number) {
+    if (this.fase !== 'musica') return;
+    this.fase = 'alto';
+    const [a, b] = RANGO_BOTS[this.opts.dificultad];
+    const f = Math.pow(0.92, this.ronda - 1);
+    this.jugadores.forEach((p) => {
+      if (!p.vivo || p.tu) return;
+      const espera = (a + this.rnd() * (b - a)) * f;
+      this.en(ahora, espera, (t) => this.reclamar(p.id, t));
+    });
+    // si tú ya estás fuera (espectando) no hay que esperarte
+    this.emitir('alto');
+  }
+
+  geometria(ahora: number): Geometria {
+    const N = this.enRonda.length;
+    const C = Math.max(1, N - 1);
+    const rc = radioSillas(C);
+    const sillas: [number, number][] = [];
+    for (let i = 0; i < C; i++) {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / C;
+      sillas.push([rc * Math.cos(a), rc * Math.sin(a)]);
+    }
+    const orbita: Record<number, [number, number]> = {};
+    const pos: Record<number, [number, number]> = {};
+    this.enRonda.forEach((id, j) => {
+      const a = this.theta + (2 * Math.PI * j) / N;
+      const o: [number, number] = [RADIO_ORBITA * Math.cos(a), RADIO_ORBITA * Math.sin(a)];
+      orbita[id] = o;
+      const c = this.reclamos[id];
+      if (c) {
+        let t = Math.min(1, (ahora - c.t0) / 320);
+        t = 1 - Math.pow(1 - t, 3);
+        const [sx, sz] = sillas[c.silla];
+        pos[id] = [c.desde[0] + (sx - c.desde[0]) * t, c.desde[1] + (sz - c.desde[1]) * t];
+      } else pos[id] = o;
+    });
+    return { sillas, pos, orbita, N, C };
+  }
+
+  /** Un jugador corre a la silla libre más cercana. */
+  reclamar(id: number, ahora: number) {
+    if (this.fase !== 'alto' || this.reclamos[id]) return false;
+    const p = this.jugadores.find((q) => q.id === id);
+    if (!p || !p.vivo) return false;
+    const geo = this.geometria(ahora);
+    const yo = geo.orbita[id];
+    if (!yo) return false;
+    const ocupadas = new Set(Object.values(this.reclamos).map((r) => r.silla));
+    let mejor = -1;
+    let dist = Infinity;
+    geo.sillas.forEach(([x, z], i) => {
+      if (ocupadas.has(i)) return;
+      const d = Math.hypot(x - yo[0], z - yo[1]);
+      if (d < dist) {
+        dist = d;
+        mejor = i;
+      }
+    });
+    if (mejor < 0) return false;
+    this.reclamos[id] = { silla: mejor, t0: ahora, desde: yo };
+    if (p.tu) this.emitir('sentado');
+    else this.version++;
+    if (Object.keys(this.reclamos).length >= geo.C) this.terminarRonda(ahora);
+    return true;
+  }
+
+  /** Botón Sentarse. */
+  sentarse(ahora: number) {
+    return this.reclamar(0, ahora);
+  }
+
+  /** Tocar un paso de la rueda mientras suena la música: +5 puntos. */
+  bailar(id: DanceId, ahora: number) {
+    if (this.fase !== 'musica' || !this.tu.vivo || ahora < this.baileHasta) return false;
+    this.baile = id;
+    this.baileHasta = ahora + (datosPaso(id)?.dura ?? 1700);
+    this.pts += PUNTOS_PASO;
+    this.pasosBailados++;
+    this.flash = `+${PUNTOS_PASO} estilo`;
+    this.flashHasta = ahora + 1100;
+    this.emitir('paso');
+    return true;
+  }
+
+  private terminarRonda(ahora: number) {
+    this.limpiarAgenda();
+    const perdedorId = this.enRonda.find((id) => !this.reclamos[id]);
+    const perdedor = this.jugadores.find((p) => p.id === perdedorId);
+    if (!perdedor) return;
+    perdedor.vivo = false;
+    this.ultimoFuera = perdedor.nombre;
+    if (!perdedor.tu && this.tu.vivo) {
+      this.pts += PUNTOS_RONDA; // al espectar ya no se suman puntos
+      this.rondasSobrevividas++;
+    }
+    const vivos = this.jugadores.filter((p) => p.vivo);
+    if (perdedor.tu) {
+      this.fase = 'fin';
+      this.gano = false;
+      this.puesto = vivos.length + 1;
+      this.emitir('fuera');
+    } else if (vivos.length === 1) {
+      this.fase = 'fin';
+      this.ganador = vivos[0].nombre;
+      this.ganadorId = vivos[0].id;
+      this.finEn = ahora;
+      if (vivos[0].tu) {
+        this.gano = true;
+        this.puesto = 1;
+        this.pts += PUNTOS_GANAR;
+        this.emitir('ganaste');
+      } else this.emitir('fin');
+    } else {
+      this.fase = 'resultado';
+      if (this.espectando) this.en(ahora, 1800, (t) => this.siguiente(t));
+      this.emitir('fuera');
+    }
+  }
+
+  /** Botón Siguiente ronda. */
+  siguiente(ahora: number) {
+    if (this.fase !== 'resultado') return;
+    this.empezarRonda(ahora, this.ronda + 1);
+  }
+
+  get puedeEspectar() {
+    return this.fase === 'fin' && !this.gano && this.jugadores.filter((p) => p.vivo).length >= 2;
+  }
+
+  /** Después de perder: ver cómo termina la partida (las rondas siguen solas). */
+  espectar(ahora: number) {
+    if (!this.puedeEspectar) return;
+    this.espectando = true;
+    this.fase = 'resultado';
+    this.en(ahora, 900, (t) => this.siguiente(t));
+    this.emitir('musica');
+  }
+
+  /** Avanza el tiempo. `dt` en milisegundos. */
+  actualizar(ahora: number, dt: number) {
+    if (this.fase === 'musica') {
+      this.theta += dt * this.velocidad();
+      this.andar += dt * 0.012;
+    } else if (this.fase === 'cuenta') {
+      this.theta += dt * 0.00035;
+      this.andar += dt * 0.006;
+    }
+    // ejecuta lo agendado en orden (lo que se agenda dentro entra en la siguiente vuelta)
+    const listos = this.agenda.filter((e) => e.en <= ahora).sort((a, b) => a.en - b.en);
+    if (listos.length) {
+      this.agenda = this.agenda.filter((e) => e.en > ahora);
+      listos.forEach((e) => e.fn(ahora));
+    }
+  }
+
+  /** Qué hace cada avatar en este momento (para la escena 3D). */
+  pose(id: number, ahora: number): { anim: AvatarAnim; sentado: boolean; celebra: boolean; fuera: boolean } {
+    const j = this.enRonda.indexOf(id);
+    const p = this.jugadores.find((q) => q.id === id);
+    const reclamo = this.reclamos[id];
+    const fuera = !!p && !p.vivo;
+    const desdeFin = ahora - this.finEn;
+    if (this.fase === 'fin' && this.ganadorId === id && desdeFin > 500) {
+      const pasos: AvatarAnim[] = ['brazos', 'dab', 'macarena'];
+      return { anim: pasos[Math.floor(desdeFin / 3400) % 3], sentado: false, celebra: true, fuera };
+    }
+    if (reclamo) return { anim: 'idle', sentado: true, celebra: false, fuera };
+    if (fuera) return { anim: 'idle', sentado: false, celebra: false, fuera };
+    if (this.fase === 'musica') {
+      if (p?.tu) return { anim: ahora < this.baileHasta && this.baile ? this.baile : 'caminar', sentado: false, celebra: false, fuera };
+      const k = Math.floor(this.andar / 4 + j * 1.7) % 6;
+      const extra: AvatarAnim[] = ['macarena', 'aura', 'dab', 'moonwalk'];
+      const anim: AvatarAnim = k === 0 ? 'brazos' : k === 1 ? 'balanceo' : k === 2 ? extra[j % 4] : 'caminar';
+      return { anim, sentado: false, celebra: false, fuera };
+    }
+    if (this.fase === 'cuenta') return { anim: 'caminar', sentado: false, celebra: false, fuera };
+    return { anim: 'idle', sentado: false, celebra: false, fuera };
+  }
+
+  /** Resumen al terminar (para guardar puntos y monedas). */
+  resumen() {
+    return {
+      puntos: this.pts,
+      gano: this.gano,
+      puesto: this.gano ? 1 : this.puesto,
+      jugadores: this.total,
+      rondas: this.rondasSobrevividas,
+      pasos: this.pasosBailados,
+    };
+  }
+}
