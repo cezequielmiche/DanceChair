@@ -40,7 +40,10 @@ export const enSilencio = () => silencio;
 export function musicaOn(ronda: number) {
   if (!musica || silencio) return;
   try {
-    musica.playbackRate = Math.min(1.5, 1 + (ronda - 1) * 0.06);
+    // En iOS `playbackRate` es solo de lectura: asignarlo lanza un error y la música nunca empezaba.
+    musica.setPlaybackRate(Math.min(1.5, 1 + (ronda - 1) * 0.06));
+  } catch {}
+  try {
     musica.play();
   } catch {}
 }
