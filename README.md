@@ -10,10 +10,12 @@ Primera versión: **contra bots**. El modo en línea viene en la segunda fase.
 
 ```bash
 npm install
-npx expo start
+npx expo start --go
 ```
 
 Escanea el código QR con **Expo Go** (Android) o con la cámara (iPhone). Todo lo que usa la app viene incluido en Expo Go.
+El `--go` hace falta porque el proyecto incluye `expo-dev-client`: sin él, el QR abre un build de desarrollo en vez de Expo Go.
+El teléfono y la computadora deben estar en la misma red Wi-Fi; si no se conecta, usa `npx expo start --go --tunnel`.
 
 Sin configurar nada la app abre en **modo local**: tu avatar, monedas y puntos se guardan en el teléfono y el ranking es de ejemplo.
 
@@ -23,7 +25,7 @@ Sin configurar nada la app abre en **modo local**: tu avatar, monedas y puntos s
 2. En **SQL Editor** pega y ejecuta `supabase/migrations/20261013000000_inicial.sql`
    (o con la CLI: `supabase link` y `supabase db push`).
 3. Copia `.env.example` como `.env` y pon la **URL** y la **anon key** (Project Settings → API).
-4. Vuelve a abrir `npx expo start`.
+4. Vuelve a abrir `npx expo start --go`.
 
 Qué crea la migración:
 
