@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import { PanResponder, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
+import '@/lib/three';
 import { C } from '@/ui/tema';
 import { useModelos } from './modelos';
 import { AvatarRig } from './rig';
@@ -64,7 +65,7 @@ export function Avatar3D({ avatares, style, encuadre = 'cuerpo', girar = true, p
   return (
     <View style={[styles.caja, style]} {...pan.panHandlers}>
       <Canvas
-        shadows
+        shadows="percentage"
         camera={{ position: cam, fov: busto ? 26 : 30, near: 0.05, far: 50 }}
         onCreated={({ camera, gl }) => {
           camera.lookAt(...mira);

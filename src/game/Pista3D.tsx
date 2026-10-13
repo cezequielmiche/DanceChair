@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import { StyleProp, View, ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
+import '@/lib/three';
 import { useModelos } from '@/avatar/modelos';
 import { AvatarRig } from '@/avatar/rig';
 import { C } from '@/ui/tema';
@@ -34,7 +35,7 @@ export function Pista3D({ juego, etiquetas, style }: Props) {
   return (
     <View style={style}>
       <Canvas
-        shadows
+        shadows="percentage"
         camera={{ position: CAM_PISTA.toArray() as [number, number, number], fov: 36, near: 0.1, far: 60 }}
         onCreated={({ camera, gl }) => {
           camera.lookAt(MIRA_PISTA);
