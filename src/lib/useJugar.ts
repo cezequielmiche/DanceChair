@@ -1,5 +1,5 @@
 // Empezar una partida (botón Jugar del inicio y "Guardar y jugar" del avatar): primero se revisa la conexión.
-// Sin internet, contra bots (solo monedas); con internet y cuenta, en línea; con internet sin cuenta, se pregunta.
+// Sin internet, contra bots (solo monedas); con internet y cuenta, a buscar sala; con internet sin cuenta, se pregunta.
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
@@ -18,7 +18,8 @@ export function useJugar() {
     setRevisando(true);
     const internet = await hayInternet();
     setRevisando(false);
-    const abrir = (m: ModoPartida) => router.push({ pathname: '/juego', params: { dificultad, jugadores: '6', modo: m } });
+    const abrir = (m: ModoPartida) =>
+      m === 'linea' ? router.push({ pathname: '/sala', params: { dificultad } }) : router.push({ pathname: '/juego', params: { dificultad, jugadores: '6', modo: m } });
     const decision = elegirModo({ internet, servidor: hayServidor, cuenta: useJugador.getState().modo === 'cuenta' });
     if (decision !== 'sesion') return abrir(decision);
     Alert.alert('Juega en línea', 'Inicia sesión para jugar contra otras personas y sumar puntos al ranking. Contra bots solo ganas monedas.', [

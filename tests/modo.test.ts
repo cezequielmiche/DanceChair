@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { elegirModo, monedasContraBots } from '../src/game/modo';
+import { conTopeDiario, diaDe, elegirModo, monedasContraBots } from '../src/game/modo';
 
 test('sin internet se juega contra bots, con o sin cuenta', () => {
   assert.equal(elegirModo({ internet: false, servidor: true, cuenta: true }), 'bots');
@@ -23,4 +23,16 @@ test('contra bots: una moneda por cada 10 puntos', () => {
   assert.equal(monedasContraBots(0), 0);
   assert.equal(monedasContraBots(9), 0);
   assert.equal(monedasContraBots(135), 13);
+});
+
+test('tope diario contra bots: no pasa de 150 en el día', () => {
+  assert.equal(conTopeDiario(20, 0), 20);
+  assert.equal(conTopeDiario(20, 140), 10);
+  assert.equal(conTopeDiario(20, 150), 0);
+  assert.equal(conTopeDiario(20, 170), 0);
+});
+
+test('el día se cuenta en hora local', () => {
+  assert.equal(diaDe(new Date(2026, 9, 14, 23, 59).getTime()), '2026-10-14');
+  assert.equal(diaDe(new Date(2026, 9, 15, 0, 1).getTime()), '2026-10-15');
 });

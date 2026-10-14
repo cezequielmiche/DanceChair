@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { AVATAR_DEFAULT } from '../src/avatar/types';
-import { Juego, type Dificultad } from '../src/game/juego';
+import { ESPERA_RONDA, Juego, type Dificultad } from '../src/game/juego';
 
 // números al azar repetibles
 function semilla(s: number) {
@@ -125,4 +125,45 @@ test('al final el ganador baila y después la partida queda quieta', () => {
   assert.equal(g.quieto(g.finEn + 20000), true);
   g.iniciar(g.finEn + 20000);
   assert.equal(g.quieto(g.finEn + 20000), false);
+});
+
+test('en línea: los jugadores de la sala van primero y el resto se completa con bots', () => {
+  const g = new Juego({
+    jugadores: 6,
+    dificultad: 'Normal',
+    tuNombre: 'Tú',
+    tuAvatar: AVATAR_DEFAULT,
+    favoritos: [null, null, null, null],
+    rivales: [
+      { nombre: 'Ana', avatar: AVATAR_DEFAULT },
+      { nombre: 'Leo', avatar: AVATAR_DEFAULT },
+    ],
+  });
+  assert.equal(g.jugadores.length, 6);
+  assert.deepEqual(
+    g.jugadores.slice(0, 3).map((p) => p.nombre),
+    ['Tú', 'Ana', 'Leo'],
+  );
+});
+
+test('en línea la siguiente ronda arranca sola a los 3 s (sin tocar Siguiente)', () => {
+  const g = new Juego({ jugadores: 4, dificultad: 'Normal', tuNombre: 'Tú', tuAvatar: AVATAR_DEFAULT, favoritos: [null, null, null, null], automatico: true });
+  let t = 0;
+  g.iniciar(t);
+  // avanzar hasta que haya resultado de la primera ronda, sentándose apenas para la música
+  while (g.fase !== 'resultado' && g.fase !== 'fin' && t < 60000) {
+    t += 50;
+    g.actualizar(t, 50);
+    if (g.fase === 'alto') g.sentarse(t);
+  }
+  if (g.fase === 'fin') return; // te quedaste sin silla: no aplica
+  assert.equal(g.ronda, 1);
+  assert.equal(g.siguienteEn, t + ESPERA_RONDA);
+  const fin = t + ESPERA_RONDA;
+  while (t < fin + 100) {
+    t += 50;
+    g.actualizar(t, 50);
+  }
+  assert.equal(g.ronda, 2);
+  assert.equal(g.siguienteEn, 0);
 });

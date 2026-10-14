@@ -159,3 +159,132 @@ export async function ranking(tipo: 'semanal' | 'global' | 'amigos'): Promise<Fi
   if (e) throw error(e);
   return (data ?? []) as FilaRanking[];
 }
+
+// ---------------------------------------------------------------- Salas (partidas en línea)
+export interface JugadorSala {
+  user_id: string;
+  nombre: string;
+  avatar: Partial<AvatarConfig>;
+  tu: boolean;
+}
+
+export interface EstadoSala {
+  id: string;
+  estado: 'esperando' | 'jugando' | 'terminada';
+  dificultad: 'Fácil' | 'Normal' | 'Difícil';
+  semilla: number;
+  /** Lugares que se completan con bots (se sabe al arrancar). */
+  bots: number;
+  /** Hora del servidor (para medir la cuenta regresiva aunque el reloj del teléfono esté mal). */
+  ahora: string;
+  /** Cuándo arranca la sala aunque no se llene. */
+  empieza: string;
+  inicio: string | null;
+  jugadores: JugadorSala[];
+}
+
+/** Entra a una sala en espera (o crea una) y devuelve su id. */
+export async function buscarSala(dificultad: EstadoSala['dificultad']): Promise<string> {
+  const { data, error: e } = await sb().rpc('buscar_sala', { p_dificultad: dificultad });
+  if (e) throw error(e);
+  return data as string;
+}
+
+/** Cómo va la sala. Si ya se llenó o pasó el tiempo, el servidor la arranca. */
+export async function estadoSala(id: string): Promise<EstadoSala> {
+  const { data, error: e } = await sb().rpc('estado_sala', { p_sala: id });
+  if (e) throw error(e);
+  return data as EstadoSala;
+}
+
+export async function salirSala(id: string) {
+  const { error: e } = await sb().rpc('salir_sala', { p_sala: id });
+  if (e) throw error(e);
+}
+
+// ---------------------------------------------------------------- Amigos y conexión
+export interface Amigo {
+  id: string;
+  nombre: string;
+  avatar: Partial<AvatarConfig>;
+  conectado: boolean;
+  /** Último latido (null si nunca abrió la app con esta versión). */
+  visto: string | null;
+}
+
+export interface JugadorEncontrado {
+  id: string;
+  nombre: string;
+  avatar: Partial<AvatarConfig>;
+  /** 'amigo', 'enviada' (pendiente), 'recibida' (te la mandó) o null. */
+  estado: 'amigo' | 'enviada' | 'recibida' | null;
+}
+
+export interface Solicitud {
+  id: string;
+  nombre: string;
+  avatar: Partial<AvatarConfig>;
+  /** 'recibida' = puedes aceptarla o rechazarla; 'enviada' = la mandaste tú (pendiente). */
+  tipo: 'recibida' | 'enviada';
+}
+
+/** Mis amigos, primero los conectados. */
+export async function misAmigos(): Promise<Amigo[]> {
+  const { data, error: e } = await sb().rpc('mis_amigos');
+  if (e) throw error(e);
+  return (data ?? []) as Amigo[];
+}
+
+export async function buscarJugadores(texto: string): Promise<JugadorEncontrado[]> {
+  const { data, error: e } = await sb().rpc('buscar_jugadores', { p_texto: texto });
+  if (e) throw error(e);
+  return (data ?? []) as JugadorEncontrado[];
+}
+
+/** Manda solicitud de amistad. Devuelve 'amigos' si el otro ya te había mandado una (quedan como amigos). */
+export async function enviarSolicitud(id: string): Promise<'enviada' | 'amigos'> {
+  const { data, error: e } = await sb().rpc('enviar_solicitud', { p_para: id });
+  if (e) throw error(e);
+  return data as 'enviada' | 'amigos';
+}
+
+export async function responderSolicitud(de: string, acepta: boolean) {
+  const { error: e } = await sb().rpc('responder_solicitud', { p_de: de, p_acepta: acepta });
+  if (e) throw error(e);
+}
+
+export async function cancelarSolicitud(para: string) {
+  const { error: e } = await sb().rpc('cancelar_solicitud', { p_para: para });
+  if (e) throw error(e);
+}
+
+/** Deja de ser amigos (para los dos). */
+export async function quitarAmigo(id: string) {
+  const { error: e } = await sb().rpc('quitar_amigo', { p_amigo: id });
+  if (e) throw error(e);
+}
+
+/** Recibidas primero y luego las que mandaste. */
+export async function misSolicitudes(): Promise<Solicitud[]> {
+  const { data, error: e } = await sb().rpc('mis_solicitudes');
+  if (e) throw error(e);
+  return (data ?? []) as Solicitud[];
+}
+
+/** Para el numerito del ícono de amigos. */
+export async function solicitudesRecibidas(): Promise<number> {
+  const { data, error: e } = await sb().rpc('solicitudes_recibidas');
+  if (e) throw error(e);
+  return (data as number) ?? 0;
+}
+
+/** "Sigo conectado" (la app lo manda cada 45 s mientras está abierta con cuenta). */
+export async function latido() {
+  const { error: e } = await sb().rpc('latido');
+  if (e) throw error(e);
+}
+
+export async function desconectar() {
+  const { error: e } = await sb().rpc('desconectar');
+  if (e) throw error(e);
+}

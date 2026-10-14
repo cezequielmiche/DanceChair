@@ -28,6 +28,10 @@ export interface Opciones {
   tuNombre: string;
   tuAvatar: AvatarConfig;
   favoritos: (DanceId | null)[];
+  /** Otros jugadores de la sala (en línea). Los lugares que falten se completan con bots. */
+  rivales?: { nombre: string; avatar: AvatarConfig }[];
+  /** En línea nadie toca "Siguiente": la ronda siguiente arranca sola tras ESPERA_RONDA. */
+  automatico?: boolean;
   random?: () => number;
 }
 
@@ -47,6 +51,8 @@ const PUNTOS_GANAR = 100;
 const PUNTOS_PASO = 5;
 /** El ganador baila sus 3 pasos al final (ms desde que termina la partida); luego se queda quieto. */
 const FIN_BAILE = 500 + 3 * 3400;
+/** En línea: espera entre el resultado de una ronda y la siguiente (ms). */
+export const ESPERA_RONDA = 3000;
 
 const RANGO_BOTS: Record<Dificultad, [number, number]> = {
   Fácil: [650, 1500],
@@ -73,6 +79,8 @@ export class Juego {
   ganador = '';
   finEn = 0;
   espectando = false;
+  /** En línea: hora en que arranca sola la siguiente ronda (para la cuenta regresiva); 0 si no hay. */
+  siguienteEn = 0;
   ultimoFuera = '';
   baile: DanceId | null = null;
   baileHasta = 0;
@@ -119,10 +127,11 @@ export class Juego {
 
   private armarJugadores() {
     const n = Math.max(3, Math.min(8, Math.round(this.opts.jugadores)));
-    const bots = elegirBots(n - 1, this.rnd);
+    const rivales = (this.opts.rivales ?? []).slice(0, n - 1);
+    const bots = elegirBots(n - 1 - rivales.length, this.rnd).map((b) => ({ nombre: b.nombre, avatar: b as AvatarConfig }));
     this.jugadores = [
       { id: 0, nombre: this.opts.tuNombre || 'Tú', tu: true, vivo: true, avatar: this.opts.tuAvatar },
-      ...bots.map((b, i) => ({ id: i + 1, nombre: b.nombre, tu: false, vivo: true, avatar: b })),
+      ...[...rivales, ...bots].map((r, i) => ({ id: i + 1, nombre: r.nombre, tu: false, vivo: true, avatar: r.avatar })),
     ];
     this.enRonda = this.jugadores.map((p) => p.id);
     this.reclamos = {};
@@ -134,6 +143,7 @@ export class Juego {
     this.limpiarAgenda();
     this.armarJugadores();
     this.fase = 'cuenta';
+    this.siguienteEn = 0;
     this.cuenta = 3;
     this.ronda = 0;
     this.pts = 0;
@@ -290,6 +300,10 @@ export class Juego {
     } else {
       this.fase = 'resultado';
       if (this.espectando) this.en(ahora, 1800, (t) => this.siguiente(t));
+      else if (this.opts.automatico) {
+        this.siguienteEn = ahora + ESPERA_RONDA;
+        this.en(ahora, ESPERA_RONDA, (t) => this.siguiente(t));
+      }
       this.emitir('fuera');
     }
   }
@@ -297,6 +311,7 @@ export class Juego {
   /** Botón Siguiente ronda. */
   siguiente(ahora: number) {
     if (this.fase !== 'resultado') return;
+    this.siguienteEn = 0;
     this.empezarRonda(ahora, this.ronda + 1);
   }
 

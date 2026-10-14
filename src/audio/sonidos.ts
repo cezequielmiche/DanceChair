@@ -9,6 +9,7 @@ const ARCHIVOS = {
   sentado: require('../../assets/audio/sentado.wav'),
   ganaste: require('../../assets/audio/ganaste.wav'),
   paso: require('../../assets/audio/paso.wav'),
+  pitido: require('../../assets/audio/pitido.wav'),
 };
 type Efecto = Exclude<keyof typeof ARCHIVOS, 'musica'>;
 

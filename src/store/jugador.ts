@@ -8,7 +8,7 @@ import * as audio from '@/audio/sonidos';
 import { AVATAR_DEFAULT, type AvatarConfig, type DanceId } from '@/avatar/types';
 import { articulo, GRATIS, soloLoQueTiene } from '@/data/catalogo';
 import * as api from '@/lib/api';
-import { monedasContraBots, type ModoPartida } from '@/game/modo';
+import { conTopeDiario, diaDe, monedasContraBots, type ModoPartida } from '@/game/modo';
 import { hayServidor } from '@/lib/supabase';
 
 export type Modo = 'local' | 'cuenta';
@@ -31,6 +31,8 @@ interface Estado {
   monedasPendientes: number;
   /** Música y sonidos apagados: se queda así (aun al cerrar la app o la sesión) hasta que se vuelvan a prender. */
   silencio: boolean;
+  /** Monedas ganadas hoy contra bots (tienen tope diario). No se reinicia al cerrar sesión. */
+  monedasHoy: { dia: string; n: number };
   ultimaGanancia: number;
   cargando: boolean;
   aviso: string;
@@ -59,6 +61,7 @@ const INICIAL = {
   partidas: [] as PartidaLocal[],
   monedasPendientes: 0,
   silencio: false,
+  monedasHoy: { dia: '', n: 0 },
   ultimaGanancia: 0,
   cargando: false,
   aviso: '',
@@ -100,8 +103,12 @@ export const useJugador = create<Estado>()(
       },
 
       salir: async () => {
-        if (get().modo === 'cuenta' && hayServidor) await api.salir().catch(() => {});
-        set({ ...INICIAL, silencio: get().silencio });
+        if (get().modo === 'cuenta' && hayServidor) {
+          // antes de cerrar la sesión (después ya no se puede): que tus amigos te vean desconectado
+          await api.desconectar().catch(() => {});
+          await api.salir().catch(() => {});
+        }
+        set({ ...INICIAL, silencio: get().silencio, monedasHoy: get().monedasHoy });
       },
 
       setSilencio: (v) => {
@@ -149,8 +156,11 @@ export const useJugador = create<Estado>()(
         const s = get();
         if (modoPartida === 'bots') {
           // TODO(fase 4): subir monedasPendientes al servidor cuando vuelva la conexión
-          const ganadas = monedasContraBots(r.puntos);
+          const dia = diaDe(Date.now());
+          const yaHoy = s.monedasHoy.dia === dia ? s.monedasHoy.n : 0;
+          const ganadas = conTopeDiario(monedasContraBots(r.puntos), yaHoy);
           set({
+            monedasHoy: { dia, n: yaHoy + ganadas },
             monedas: s.monedas + ganadas,
             monedasPendientes: s.modo === 'cuenta' ? s.monedasPendientes + ganadas : 0,
             ultimaGanancia: 0,
@@ -192,6 +202,7 @@ export const useJugador = create<Estado>()(
         partidas: s.partidas,
         monedasPendientes: s.monedasPendientes,
         silencio: s.silencio,
+        monedasHoy: s.monedasHoy,
         ultimaGanancia: s.ultimaGanancia,
       }),
     },

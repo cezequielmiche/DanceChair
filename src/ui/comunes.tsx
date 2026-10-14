@@ -102,6 +102,28 @@ export function Interruptor({ titulo, valor, onCambio }: { titulo: string; valor
   );
 }
 
+/** Avatar en miniatura (cara y camiseta) para listas: sala de espera, amigos. Sin avatar: lugar vacío. */
+export function MiniAvatar({ piel, camisa, size = 48, borde, vacio }: { piel?: string; camisa?: string; size?: number; borde?: string; vacio?: boolean }) {
+  const k = size / 56;
+  return (
+    <View
+      style={[
+        styles.mini,
+        { width: size, height: size, borderRadius: size / 2 },
+        vacio && styles.miniVacio,
+        borde ? { borderColor: borde } : null,
+      ]}
+    >
+      {vacio ? null : (
+        <>
+          <View style={{ width: 28 * k, height: 28 * k, borderRadius: 14 * k, marginTop: 8 * k, backgroundColor: piel }} />
+          <View style={{ width: 42 * k, height: 24 * k, borderRadius: 12 * k, marginTop: 2 * k, backgroundColor: camisa }} />
+        </>
+      )}
+    </View>
+  );
+}
+
 export function Etiqueta({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[styles.etiqueta, style]}>{children}</Text>;
 }
@@ -122,6 +144,8 @@ export function Aviso({ texto, onFin }: { texto: string; onFin: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  mini: { borderWidth: 2, borderColor: C.tarjeta, backgroundColor: C.piso, overflow: 'hidden', alignItems: 'center' },
+  miniVacio: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: C.tinta2 },
   boton: { height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 16 },
   sombra: { shadowColor: '#000', shadowOpacity: 0.35, shadowOffset: { width: 0, height: 5 }, shadowRadius: 0, elevation: 4 },
   botonTxt: { fontFamily: F.titulo, fontSize: 22, color: C.fondo },

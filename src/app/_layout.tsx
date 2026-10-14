@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { supabase } from '@/lib/supabase';
+import { useLatido } from '@/lib/useLatido';
 import { useJugador } from '@/store/jugador';
 import { C } from '@/ui/tema';
 
@@ -15,6 +16,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 export default function Raiz() {
   const [fuentes] = useFonts({ Baloo2_600SemiBold, Baloo2_800ExtraBold, Nunito_400Regular, Nunito_700Bold, Nunito_800ExtraBold });
   const [hidratado, setHidratado] = useState(useJugador.persist.hasHydrated());
+  useLatido(useJugador((s) => s.modo) === 'cuenta');
 
   useEffect(() => useJugador.persist.onFinishHydration(() => setHidratado(true)), []);
 
@@ -43,7 +45,9 @@ export default function Raiz() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
         <Stack.Screen name="auth" />
+        <Stack.Screen name="sala" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ajustes" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="amigos" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="juego" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
       </Stack>
     </SafeAreaProvider>

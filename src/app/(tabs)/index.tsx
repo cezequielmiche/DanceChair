@@ -12,7 +12,7 @@ import * as api from '@/lib/api';
 import { useJugar } from '@/lib/useJugar';
 import { puntosSemana, useJugador } from '@/store/jugador';
 import { Boton, Opciones, Pestanas } from '@/ui/comunes';
-import { Engrane, Jugar, Moneda } from '@/ui/iconos';
+import { Amigos, Engrane, Jugar, Moneda } from '@/ui/iconos';
 import { C, F, fmt } from '@/ui/tema';
 
 type Tipo = 'semanal' | 'global' | 'amigos';
@@ -69,6 +69,18 @@ export default function Inicio() {
 
   useFocusEffect(cargar);
 
+  // numerito del ícono de amigos: solicitudes que te mandaron (al volver al inicio y cada 30 s)
+  const [solicitudes, setSolicitudes] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      if (modo !== 'cuenta') return;
+      const revisar = () => api.solicitudesRecibidas().then(setSolicitudes).catch(() => {});
+      revisar();
+      const t = setInterval(revisar, 30_000);
+      return () => clearInterval(t);
+    }, [modo]),
+  );
+
 
   const yo = filas?.find((f) => f.tu);
   const arriba = yo && filas ? filas.find((f) => f.puesto === yo.puesto - 1) : undefined;
@@ -95,6 +107,18 @@ export default function Inicio() {
         <Pressable accessibilityLabel="Monedas, ir a la tienda" onPress={() => router.push('/tienda')} style={styles.monedas}>
           <Moneda />
           <Text style={styles.monedasTxt}>{fmt(monedas)}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={modo === 'cuenta' && solicitudes ? `Amigos, ${solicitudes} solicitudes nuevas` : 'Amigos'}
+          onPress={() => router.push('/amigos')}
+          style={styles.engrane}
+        >
+          <Amigos size={20} />
+          {modo === 'cuenta' && solicitudes > 0 ? (
+            <View style={styles.globo}>
+              <Text style={styles.globoTxt}>{solicitudes > 9 ? '9+' : solicitudes}</Text>
+            </View>
+          ) : null}
         </Pressable>
         <Pressable accessibilityLabel="Ajustes" onPress={() => router.push('/ajustes')} style={styles.engrane}>
           <Engrane />
@@ -185,6 +209,8 @@ const styles = StyleSheet.create({
   nombre: { fontFamily: F.titulo, fontSize: 22, lineHeight: 30, color: C.tinta },
   monedas: { height: 40, paddingLeft: 8, paddingRight: 12, borderRadius: 999, borderWidth: 2, borderColor: C.borde, backgroundColor: C.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 6 },
   engrane: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.borde, backgroundColor: C.tarjeta, alignItems: 'center', justifyContent: 'center' },
+  globo: { position: 'absolute', top: -6, right: -6, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: C.coral, borderWidth: 2, borderColor: C.pantalla, alignItems: 'center', justifyContent: 'center' },
+  globoTxt: { fontFamily: F.fuerte, fontSize: 11, lineHeight: 14, color: '#FFF' },
   monedasTxt: { fontFamily: F.fuerte, fontSize: 15, color: '#FFF' },
   tarjeta: { backgroundColor: C.tarjeta, borderRadius: 20, padding: 16, gap: 6 },
   filaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

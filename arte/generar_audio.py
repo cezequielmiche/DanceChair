@@ -35,4 +35,6 @@ for k,m in enumerate([72,76,79,84]):
     x=tone(m,0.3 if k<3 else 0.5,'square',0.4); i=int(k*0.14*SR); fan[i:i+len(x)]+=x[:len(fan)-i]
 save('ganaste.wav', fan)
 save('paso.wav', tone(88,0.08,'sine',0.5))
+# cuenta regresiva entre rondas en línea (uno por segundo)
+save('pitido.wav', tone(81,0.12,'sine',0.55))
 print('ok')

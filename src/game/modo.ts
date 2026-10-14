@@ -13,3 +13,17 @@ export function elegirModo(o: { internet: boolean; servidor: boolean; cuenta: bo
 export function monedasContraBots(puntos: number) {
   return Math.floor(puntos / 10);
 }
+
+/** Tope de monedas por día jugando contra bots (para que no se junten sin límite). */
+export const TOPE_DIARIO_BOTS = 150;
+
+/** Día local como "2026-10-14" (el tope se reinicia a medianoche). */
+export function diaDe(ms: number) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Cuántas de las monedas ganadas se pueden dar hoy, según las que ya se llevan. */
+export function conTopeDiario(ganadas: number, yaHoy: number, tope = TOPE_DIARIO_BOTS) {
+  return Math.max(0, Math.min(ganadas, tope - yaHoy));
+}

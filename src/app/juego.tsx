@@ -1,4 +1,5 @@
-// Pantalla del juego (contra bots sin conexión; en línea, por ahora también contra bots hasta tener salas): pista 3D arriba; abajo la rueda de pasos con Sentarse y los jugadores a los lados.
+// Pantalla del juego (contra bots sin conexión; en línea, con los jugadores de la sala; por ahora los mueve la
+// computadora en cada teléfono, hasta la fase 3): pista 3D arriba; abajo la rueda de pasos con Sentarse y los jugadores a los lados.
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -9,6 +10,8 @@ import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
 import { Juego, type Dificultad } from '@/game/juego';
 import { monedasContraBots, type ModoPartida } from '@/game/modo';
+import { salaGuardada } from '@/lib/salaActual';
+import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
 import { Pista3D, type Etiqueta } from '@/game/Pista3D';
 import { Rueda } from '@/game/Rueda';
 import { Boton } from '@/ui/comunes';
@@ -18,7 +21,7 @@ import { useJugador } from '@/store/jugador';
 
 export default function PantallaJuego() {
   'use no memo'; // se anima cada cuadro: fuera del React Compiler
-  const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad; modo?: ModoPartida }>();
+  const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad; modo?: ModoPartida; sala?: string }>();
   const modo: ModoPartida = params.modo === 'linea' ? 'linea' : 'bots';
   const { avatar, favoritos, registrarPartida, silencio: mudo, setSilencio } = useJugador();
   const { width } = useWindowDimensions();
@@ -32,6 +35,11 @@ export default function PantallaJuego() {
         tuNombre: 'Tú',
         tuAvatar: avatar,
         favoritos,
+        automatico: params.modo === 'linea',
+        // en línea: los otros jugadores de la sala, con su nombre y avatar
+        rivales: salaGuardada(params.sala)
+          ?.jugadores.filter((j) => !j.tu)
+          .map((j) => ({ nombre: j.nombre, avatar: { ...AVATAR_DEFAULT, ...j.avatar } as AvatarConfig })),
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
@@ -99,6 +107,8 @@ export default function PantallaJuego() {
   const geoN = g.enRonda.length;
 
   const otraVez = () => {
+    // en línea, otra partida es otra sala
+    if (params.sala) return router.replace({ pathname: '/sala', params: { dificultad: params.dificultad ?? 'Normal' } });
     guardada.current = false;
     setGanadas(null);
     g.iniciar(performance.now());
@@ -126,7 +136,7 @@ export default function PantallaJuego() {
     tinta = C.fondo;
   } else if (g.fase === 'resultado') {
     titulo = `${g.ultimoFuera} quedó fuera`;
-    msg = `Se quita una silla. Quedan ${vivos} jugadores.${g.espectando ? ' La siguiente ronda empieza sola.' : ''}`;
+    msg = `Se quita una silla. Quedan ${vivos} jugadores.${g.espectando || g.siguienteEn ? ' La siguiente ronda empieza sola.' : ''}`;
   } else if (g.fase === 'fin') {
     if (g.gano) {
       titulo = `¡Campeón! +${premio}`;
@@ -146,12 +156,19 @@ export default function PantallaJuego() {
   const barras = [0, 1, 2, 3, 4].map((i) => (g.fase === 'musica' ? Math.round(6 + 20 * Math.abs(Math.sin(g.andar * (0.8 + i * 0.13) + i))) : 4));
 
   // ---------------- botón central
-  const accion = g.fase === 'resultado' && !g.espectando ? 'Siguiente' : g.fase === 'fin' ? 'Otra vez' : '';
+  // en línea, entre rondas el centro solo cuenta los segundos (nadie decide cuándo sigue)
+  const enEspera = g.fase === 'resultado' && !g.espectando && g.siguienteEn > 0;
+  const faltaRonda = enEspera ? Math.max(1, Math.ceil((g.siguienteEn - ahora) / 1000)) : 0;
+  // un pitido por cada segundo que baja (3, 2, 1)
+  useEffect(() => {
+    if (faltaRonda > 0) efecto('pitido');
+  }, [faltaRonda]);
+  const accion = g.fase === 'resultado' && !g.espectando && !enEspera ? 'Siguiente' : g.fase === 'fin' ? 'Otra vez' : '';
   const centroOn = !!accion || puedeSentarse;
   const pulso = puedeSentarse ? (Math.sin(ahora / 140) + 1) / 2 : 0;
   const tamRueda = Math.min(246, width - 2 * 64);
   const tamBoton = Math.round(118 * (tamRueda / 246));
-  const etiquetaCentro = accion || (g.espectando ? 'Viendo' : sentado ? '¡Sentado!' : 'Sentarse');
+  const etiquetaCentro = enEspera ? String(faltaRonda) : accion || (g.espectando ? 'Viendo' : sentado ? '¡Sentado!' : 'Sentarse');
   const alCentro = () => {
     if (g.fase === 'resultado') g.siguiente(performance.now());
     else if (g.fase === 'fin') otraVez();
@@ -273,8 +290,8 @@ export default function PantallaJuego() {
               ]}
             />
             <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={etiquetaCentro}
+              accessibilityRole={enEspera ? 'text' : 'button'}
+              accessibilityLabel={enEspera ? `La siguiente ronda empieza en ${faltaRonda} segundos` : etiquetaCentro}
               disabled={!centroOn}
               onPress={alCentro}
               style={[
@@ -283,7 +300,15 @@ export default function PantallaJuego() {
                 centroOn && styles.sombra,
               ]}
             >
-              <Text style={[styles.centroTxt, { fontSize: (accion ? 22 : 24) * (tamRueda / 246), color: centroOn || sentado ? C.fondo : C.apagado2 }]}>{etiquetaCentro}</Text>
+              <Text
+                style={[
+                  styles.centroTxt,
+                  { fontSize: (enEspera ? 40 : accion ? 22 : 24) * (tamRueda / 246), color: enEspera ? C.texto : centroOn || sentado ? C.fondo : C.apagado2 },
+                  enEspera && { lineHeight: 54 * (tamRueda / 246) },
+                ]}
+              >
+                {etiquetaCentro}
+              </Text>
             </Pressable>
           </View>
         </Rueda>
