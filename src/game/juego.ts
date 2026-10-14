@@ -14,6 +14,8 @@ export interface Jugador {
   tu: boolean;
   vivo: boolean;
   avatar: AvatarConfig;
+  /** En línea: cómo lo llama el servidor (user_id, o 'bot1', 'bot2'…). */
+  clave: string;
 }
 
 export interface Reclamo {
@@ -29,9 +31,16 @@ export interface Opciones {
   tuAvatar: AvatarConfig;
   favoritos: (DanceId | null)[];
   /** Otros jugadores de la sala (en línea). Los lugares que falten se completan con bots. */
-  rivales?: { nombre: string; avatar: AvatarConfig }[];
+  rivales?: { nombre: string; avatar: AvatarConfig; clave?: string }[];
   /** En línea nadie toca "Siguiente": la ronda siguiente arranca sola tras ESPERA_RONDA. */
   automatico?: boolean;
+  /**
+   * En línea: el servidor manda. Las horas de cada ronda llegan con `programarRonda`, quién se sienta con
+   * `reclamoRemoto` y quién queda fuera con `resolverRonda`; aquí no se sortea nada ni se mueve a los bots.
+   */
+  remoto?: boolean;
+  /** En línea: tu user_id. */
+  tuClave?: string;
   random?: () => number;
 }
 
@@ -53,6 +62,8 @@ const PUNTOS_PASO = 5;
 const FIN_BAILE = 500 + 3 * 3400;
 /** En línea: espera entre el resultado de una ronda y la siguiente (ms). */
 export const ESPERA_RONDA = 3000;
+/** En línea: si el reloj se corrige menos que esto (ms), no se vuelve a programar la ronda. */
+const AJUSTE_MIN = 30;
 
 const RANGO_BOTS: Record<Dificultad, [number, number]> = {
   Fácil: [650, 1500],
@@ -93,6 +104,8 @@ export class Juego {
   private rnd: () => number;
   private agenda: { en: number; fn: (ahora: number) => void }[] = [];
   private oyentes: ((e: Evento) => void)[] = [];
+  /** En línea: la última ronda que mandó el servidor (horas en el reloj local). */
+  private prog: { ronda: number; inicio: number; alto: number } | null = null;
 
   constructor(opts: Opciones) {
     this.opts = opts;
@@ -105,6 +118,9 @@ export class Juego {
   }
   get tu() {
     return this.jugadores.find((p) => p.tu)!;
+  }
+  get remoto() {
+    return !!this.opts.remoto;
   }
 
   on(fn: (e: Evento) => void) {
@@ -130,8 +146,9 @@ export class Juego {
     const rivales = (this.opts.rivales ?? []).slice(0, n - 1);
     const bots = elegirBots(n - 1 - rivales.length, this.rnd).map((b) => ({ nombre: b.nombre, avatar: b as AvatarConfig }));
     this.jugadores = [
-      { id: 0, nombre: this.opts.tuNombre || 'Tú', tu: true, vivo: true, avatar: this.opts.tuAvatar },
-      ...[...rivales, ...bots].map((r, i) => ({ id: i + 1, nombre: r.nombre, tu: false, vivo: true, avatar: r.avatar })),
+      { id: 0, nombre: this.opts.tuNombre || 'Tú', tu: true, vivo: true, avatar: this.opts.tuAvatar, clave: this.opts.tuClave ?? '0' },
+      ...rivales.map((r, i) => ({ id: i + 1, nombre: r.nombre, tu: false, vivo: true, avatar: r.avatar, clave: r.clave ?? String(i + 1) })),
+      ...bots.map((r, i) => ({ id: rivales.length + i + 1, nombre: r.nombre, tu: false, vivo: true, avatar: r.avatar, clave: `bot${i + 1}` })),
     ];
     this.enRonda = this.jugadores.map((p) => p.id);
     this.reclamos = {};
@@ -154,6 +171,12 @@ export class Juego {
     this.ganadorId = null;
     this.ganador = '';
     this.ultimoFuera = '';
+    this.prog = null;
+    // en línea la cuenta regresiva la marca la hora de inicio que manda el servidor
+    if (this.opts.remoto) {
+      this.emitir('cuenta');
+      return;
+    }
     const tic = (t: number) => {
       if (this.fase !== 'cuenta') return;
       this.cuenta -= 1;
@@ -174,8 +197,10 @@ export class Juego {
     this.fase = 'musica';
     this.baileHasta = 0;
     this.flashHasta = 0;
-    const dura = 3000 + this.rnd() * 5500;
-    this.en(ahora, dura, (t) => this.pararMusica(t));
+    if (!this.opts.remoto) {
+      const dura = 3000 + this.rnd() * 5500;
+      this.en(ahora, dura, (t) => this.pararMusica(t));
+    }
     this.emitir('musica');
   }
 
@@ -187,6 +212,7 @@ export class Juego {
   private pararMusica(ahora: number) {
     if (this.fase !== 'musica') return;
     this.fase = 'alto';
+    if (this.opts.remoto) return this.emitir('alto');
     const [a, b] = RANGO_BOTS[this.opts.dificultad];
     const f = Math.pow(0.92, this.ronda - 1);
     this.jugadores.forEach((p) => {
@@ -247,7 +273,7 @@ export class Juego {
     this.reclamos[id] = { silla: mejor, t0: ahora, desde: yo };
     if (p.tu) this.emitir('sentado');
     else this.version++;
-    if (Object.keys(this.reclamos).length >= geo.C) this.terminarRonda(ahora);
+    if (!this.opts.remoto && Object.keys(this.reclamos).length >= geo.C) this.terminarRonda(ahora);
     return true;
   }
 
@@ -269,9 +295,8 @@ export class Juego {
     return true;
   }
 
-  private terminarRonda(ahora: number) {
+  private terminarRonda(ahora: number, perdedorId = this.enRonda.find((id) => !this.reclamos[id])) {
     this.limpiarAgenda();
-    const perdedorId = this.enRonda.find((id) => !this.reclamos[id]);
     const perdedor = this.jugadores.find((p) => p.id === perdedorId);
     if (!perdedor) return;
     perdedor.vivo = false;
@@ -299,7 +324,9 @@ export class Juego {
       } else this.emitir('fin');
     } else {
       this.fase = 'resultado';
-      if (this.espectando) this.en(ahora, 1800, (t) => this.siguiente(t));
+      if (this.opts.remoto) {
+        // la siguiente ronda la programa el servidor
+      } else if (this.espectando) this.en(ahora, 1800, (t) => this.siguiente(t));
       else if (this.opts.automatico) {
         this.siguienteEn = ahora + ESPERA_RONDA;
         this.en(ahora, ESPERA_RONDA, (t) => this.siguiente(t));
@@ -308,11 +335,93 @@ export class Juego {
     }
   }
 
-  /** Botón Siguiente ronda. */
+  /** Botón Siguiente ronda (en línea no hace nada: la ronda arranca a la hora del servidor). */
   siguiente(ahora: number) {
+    if (!this.opts.remoto) this.pasarRonda(ahora, this.ronda + 1);
+  }
+
+  private pasarRonda(ahora: number, ronda: number) {
     if (this.fase !== 'resultado') return;
     this.siguienteEn = 0;
-    this.empezarRonda(ahora, this.ronda + 1);
+    this.empezarRonda(ahora, ronda);
+  }
+
+  // ---------------------------------------------------------------- En línea (lo que manda el servidor)
+
+  /**
+   * Horas de una ronda (ya pasadas al reloj local): cuándo empieza la música y cuándo para. Se puede llamar
+   * en cada consulta. Si las horas ya pasaron (el teléfono se atrasó), todo ocurre de inmediato y en orden.
+   * Las primeras consultas al entrar son lentas y el reloj sale con error (hasta ~1 s): cuando se corrige
+   * y las horas se mueven, la ronda se vuelve a programar.
+   */
+  programarRonda(ronda: number, inicio: number, alto: number, ahora: number) {
+    const p = this.prog;
+    if (!this.opts.remoto || (p && p.ronda > ronda)) return;
+    if (p && p.ronda === ronda && Math.abs(p.inicio - inicio) < AJUSTE_MIN && Math.abs(p.alto - alto) < AJUSTE_MIN) return;
+    this.prog = { ronda, inicio, alto };
+    if (this.ronda !== ronda) return this.aplicarProg(ahora);
+    // la ronda ya empezó: solo se puede mover el alto, si todavía no llegó
+    if (this.fase !== 'musica') return;
+    this.limpiarAgenda();
+    this.en(ahora, alto - ahora, (t) => {
+      if (this.ronda === ronda) this.pararMusica(t);
+    });
+  }
+
+  private aplicarProg(ahora: number) {
+    const p = this.prog;
+    if (!p || p.ronda <= this.ronda || this.fase === 'fin') return;
+    this.limpiarAgenda();
+    if (this.fase === 'cuenta') {
+      this.cuenta = Math.max(1, Math.min(3, Math.ceil((p.inicio - ahora) / 1000)));
+      for (const k of [2, 1]) {
+        if (p.inicio - k * 1000 > ahora)
+          this.en(ahora, p.inicio - k * 1000 - ahora, () => {
+            this.cuenta = k;
+            this.emitir('cuenta');
+          });
+      }
+      this.en(ahora, p.inicio - ahora, (t) => {
+        if (this.fase === 'cuenta') this.empezarRonda(t, p.ronda);
+      });
+    } else {
+      if (!this.espectando) this.siguienteEn = p.inicio;
+      this.en(ahora, p.inicio - ahora, (t) => this.pasarRonda(t, p.ronda));
+    }
+    this.en(ahora, p.alto - ahora, (t) => {
+      if (this.ronda === p.ronda) this.pararMusica(t);
+    });
+    this.version++;
+  }
+
+  /** Alguien llegó a su silla según el servidor (los tuyos ya se ven al tocar Sentarse). */
+  reclamoRemoto(clave: string, ahora: number) {
+    const p = this.jugadores.find((q) => q.clave === clave);
+    if (!p || this.reclamos[p.id]) return;
+    // si alguien ya se sentó, en el servidor ya pasó el alto aunque este reloj vaya un poco atrasado
+    if (this.fase === 'musica') this.pararMusica(ahora);
+    this.reclamar(p.id, ahora);
+  }
+
+  /** El servidor cerró la ronda: `clave` quedó fuera. */
+  resolverRonda(clave: string, ahora: number) {
+    const p = this.jugadores.find((q) => q.clave === clave);
+    if (!p || !p.vivo) return;
+    if (this.fase === 'fin') {
+      // ya perdiste y no estás viendo: solo se lleva la cuenta, por si decides ver cómo termina
+      p.vivo = false;
+      this.ultimoFuera = p.nombre;
+      const vivos = this.jugadores.filter((q) => q.vivo);
+      if (vivos.length === 1) {
+        this.ganador = vivos[0].nombre;
+        this.ganadorId = vivos[0].id;
+      }
+      this.version++;
+      return;
+    }
+    if (this.fase === 'musica' || this.fase === 'cuenta') this.fase = 'alto';
+    this.siguienteEn = 0;
+    this.terminarRonda(ahora, p.id);
   }
 
   get puedeEspectar() {
@@ -324,7 +433,8 @@ export class Juego {
     if (!this.puedeEspectar) return;
     this.espectando = true;
     this.fase = 'resultado';
-    this.en(ahora, 900, (t) => this.siguiente(t));
+    if (this.opts.remoto) this.aplicarProg(ahora);
+    else this.en(ahora, 900, (t) => this.siguiente(t));
     this.emitir('musica');
   }
 

@@ -1,5 +1,5 @@
-// Pantalla del juego (contra bots sin conexión; en línea, con los jugadores de la sala; por ahora los mueve la
-// computadora en cada teléfono, hasta la fase 3): pista 3D arriba; abajo la rueda de pasos con Sentarse y los jugadores a los lados.
+// Pantalla del juego (contra bots sin conexión; en línea, con los jugadores de la sala y lo que decide el servidor):
+// pista 3D arriba; abajo la rueda de pasos con Sentarse y los jugadores a los lados.
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -8,8 +8,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { efecto, musicaOff, musicaOn, prepararAudio } from '@/audio/sonidos';
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
+import { aplicarPartida, esperaConsulta, Reloj } from '@/game/enLinea';
 import { Juego, type Dificultad } from '@/game/juego';
 import { monedasContraBots, type ModoPartida } from '@/game/modo';
+import * as api from '@/lib/api';
 import { salaGuardada } from '@/lib/salaActual';
 import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
 import { Pista3D, type Etiqueta } from '@/game/Pista3D';
@@ -27,29 +29,33 @@ export default function PantallaJuego() {
   const { width } = useWindowDimensions();
   const favPasos = useMemo(() => favoritos.map((f) => (f ? datosPaso(f) ?? null : null)), [favoritos]);
 
-  const crear = useCallback(
-    () =>
-      new Juego({
-        jugadores: Number(params.jugadores ?? 6),
-        dificultad: params.dificultad ?? 'Normal',
-        tuNombre: 'Tú',
-        tuAvatar: avatar,
-        favoritos,
-        automatico: params.modo === 'linea',
-        // en línea: los otros jugadores de la sala, con su nombre y avatar
-        rivales: salaGuardada(params.sala)
-          ?.jugadores.filter((j) => !j.tu)
-          .map((j) => ({ nombre: j.nombre, avatar: { ...AVATAR_DEFAULT, ...j.avatar } as AvatarConfig })),
-      }),
+  const crear = useCallback(() => {
+    // en línea: los otros jugadores de la sala, con su nombre y avatar; los bots salen de la semilla de la sala
+    // (así tienen el mismo nombre en todos los teléfonos) y todo lo demás lo decide el servidor
+    const sala = salaGuardada(params.sala);
+    return new Juego({
+      jugadores: sala ? sala.jugadores.length + sala.bots : Number(params.jugadores ?? 6),
+      dificultad: params.dificultad ?? 'Normal',
+      tuNombre: 'Tú',
+      tuAvatar: avatar,
+      favoritos,
+      automatico: params.modo === 'linea',
+      remoto: !!sala,
+      tuClave: sala?.jugadores.find((j) => j.tu)?.user_id,
+      rivales: sala?.jugadores
+        .filter((j) => !j.tu)
+        .map((j) => ({ nombre: j.nombre, avatar: { ...AVATAR_DEFAULT, ...j.avatar } as AvatarConfig, clave: j.user_id })),
+      random: sala ? azarConSemilla(sala.semilla) : undefined,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  }, []);
   const juego = useRef<Juego>(null as unknown as Juego);
   if (!juego.current) juego.current = crear();
   const etiquetas = useRef<Etiqueta[]>([]);
   const [, setTic] = useState(0);
   const [ganadas, setGanadas] = useState<number | null>(null);
   const guardada = useRef(false);
+  const reloj = useRef(new Reloj());
 
   // Bucle: avanza el juego cada cuadro y redibuja la interfaz ~15 veces por segundo.
   useEffect(() => {
@@ -59,7 +65,6 @@ export default function PantallaJuego() {
     const g = juego.current;
     prepararAudio().then(() => g.iniciar(performance.now()));
     const quitar = g.on((e) => {
-      if (e === 'musica') musicaOn(g.ronda);
       if (e === 'alto') {
         musicaOff();
         efecto('alto');
@@ -92,6 +97,37 @@ export default function PantallaJuego() {
       cancelAnimationFrame(raf);
       quitar();
       musicaOff();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // En línea: consulta al servidor (seguido cerca del alto) y aplica lo que diga.
+  useEffect(() => {
+    const sala = params.sala;
+    const g = juego.current;
+    if (!g.remoto || !sala) return;
+    let vivo = true;
+    let t: ReturnType<typeof setTimeout>;
+    let ultimo: api.EstadoPartida | null = null;
+    const consultar = async () => {
+      const antes = performance.now();
+      try {
+        const e = await api.estadoPartida(sala);
+        if (!vivo) return;
+        const despues = performance.now();
+        reloj.current.medir(e.ahora, antes, despues);
+        aplicarPartida(g, e, reloj.current, despues);
+        ultimo = e;
+        if (e.estado === 'terminada') return;
+      } catch {
+        // sin conexión un momento: se vuelve a intentar
+      }
+      if (vivo) t = setTimeout(consultar, esperaConsulta(g, ultimo, reloj.current, performance.now()));
+    };
+    consultar();
+    return () => {
+      vivo = false;
+      clearTimeout(t);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -163,7 +199,7 @@ export default function PantallaJuego() {
   useEffect(() => {
     if (faltaRonda > 0) efecto('pitido');
   }, [faltaRonda]);
-  const accion = g.fase === 'resultado' && !g.espectando && !enEspera ? 'Siguiente' : g.fase === 'fin' ? 'Otra vez' : '';
+  const accion = g.fase === 'resultado' && !g.espectando && !enEspera && !g.remoto ? 'Siguiente' : g.fase === 'fin' ? 'Otra vez' : '';
   const centroOn = !!accion || puedeSentarse;
   const pulso = puedeSentarse ? (Math.sin(ahora / 140) + 1) / 2 : 0;
   const tamRueda = Math.min(246, width - 2 * 64);
@@ -172,7 +208,13 @@ export default function PantallaJuego() {
   const alCentro = () => {
     if (g.fase === 'resultado') g.siguiente(performance.now());
     else if (g.fase === 'fin') otraVez();
-    else g.sentarse(performance.now());
+    else if (g.sentarse(performance.now()) && g.remoto && params.sala) {
+      // en línea vale la hora en que llega al servidor; la respuesta ya trae cómo quedó la ronda
+      api
+        .reclamarSilla(params.sala, g.ronda)
+        .then((e) => aplicarPartida(g, e, reloj.current, performance.now()))
+        .catch(() => {});
+    }
   };
 
   // ---------------- jugadores a los lados (mitad y mitad)
@@ -381,3 +423,10 @@ const styles = StyleSheet.create({
   premio: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 34, paddingHorizontal: 14, borderRadius: 999, backgroundColor: C.turquesaFondo },
   premioTxt: { fontFamily: F.fuerte, fontSize: 15, color: C.turquesa },
 });
+
+/** Números al azar repetibles: con la misma semilla, los mismos bots en todos los teléfonos. */
+function azarConSemilla(semilla: number) {
+  let s = (Math.abs(semilla) % 2147483646) + 1;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+

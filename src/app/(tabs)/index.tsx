@@ -37,9 +37,17 @@ function rankingLocal(tipo: Tipo, nombre: string, avatar: AvatarConfig, mios: nu
   return filas.sort((a, b) => b.puntos - a.puntos).map((f, i) => ({ ...f, puesto: i + 1 }));
 }
 
+// Podio: las etiquetas van justo debajo de cada escalón. La cámara del visor (Avatar3D con varios avatares)
+// tiene 30° de campo vertical y queda a ~4.77 m de la base de los escalones: un metro en x mide siempre lo
+// mismo en pantalla según la altura del visor, sin importar el ancho (por eso no sirven columnas iguales).
+const ALTO_PODIO = 230;
+const PX_POR_METRO = ALTO_PODIO / 2 / (4.77 * Math.tan((15 * Math.PI) / 180));
+const ANCHO_ETIQUETA = 104;
+
 export default function Inicio() {
   const { nombre, avatar, monedas, partidas, ultimaGanancia, modo } = useJugador();
   const [tipo, setTipo] = useState<Tipo>('semanal');
+  const [anchoPodio, setAnchoPodio] = useState(0);
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [error, setError] = useState('');
   const [dificultad, setDificultad] = useState<'Fácil' | 'Normal' | 'Difícil'>('Normal');
@@ -147,16 +155,16 @@ export default function Inicio() {
         ) : (
           <>
             {podio.length ? (
-              <View>
+              <View onLayout={(e) => setAnchoPodio(e.nativeEvent.layout.width)}>
                 <Avatar3D
                   avatares={podio.map((p) => ({ config: p.fila.avatar, anim: p.anim, x: p.x, alto: p.alto, colorBase: ['#FFC233', '#C9D3EA', '#E0A070'][p.i] }))}
-                  style={{ height: 230 }}
+                  style={{ height: ALTO_PODIO }}
                   girar={false}
                   piso={false}
                 />
                 <View style={styles.podioNombres}>
                   {podio.map((p) => (
-                    <View key={p.i} style={styles.escalon}>
+                    <View key={p.i} style={[styles.escalon, { left: anchoPodio / 2 + p.x * PX_POR_METRO - ANCHO_ETIQUETA / 2 }]}>
                       <Text style={[styles.escalonPos, { color: ['#8A6A00', '#5A6585', '#9A5530'][p.i] }]}>#{p.i + 1}</Text>
                       <Text style={styles.escalonTxt} numberOfLines={1}>
                         {p.fila.tu ? 'Tú' : p.fila.nombre} · {fmt(p.fila.puntos)}
@@ -219,8 +227,8 @@ const styles = StyleSheet.create({
   puntos: { fontFamily: F.titulo, fontSize: 44, lineHeight: 60, color: C.amarillo },
   puesto: { fontFamily: F.fuerte, fontSize: 15, color: C.texto },
   texto: { fontFamily: F.texto, fontSize: 13, color: C.texto2 },
-  podioNombres: { flexDirection: 'row', justifyContent: 'space-around', marginTop: -6 },
-  escalon: { flex: 1, alignItems: 'center' },
+  podioNombres: { height: 42, marginTop: -6 },
+  escalon: { position: 'absolute', top: 0, width: ANCHO_ETIQUETA, alignItems: 'center' },
   escalonPos: { fontFamily: F.titulo, fontSize: 18, lineHeight: 24 },
   escalonTxt: { fontFamily: F.fuerte, fontSize: 12, color: C.tinta, paddingHorizontal: 4 },
   lista: { borderRadius: 16, backgroundColor: C.tarjeta, padding: 4 },

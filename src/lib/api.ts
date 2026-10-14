@@ -202,6 +202,40 @@ export async function salirSala(id: string) {
   if (e) throw error(e);
 }
 
+// ---------------------------------------------------------------- Partida en línea
+/** Lo que manda el servidor durante la partida. Horas en milisegundos desde 1970 (reloj del servidor). */
+export interface EstadoPartida {
+  estado: EstadoSala['estado'];
+  ronda: number;
+  ahora: number;
+  /** Cuándo empieza la música de la ronda actual y cuándo para. */
+  inicio: number | null;
+  alto: number | null;
+  /** Claves de los que siguen: user_id de los jugadores, 'bot1', 'bot2'… de los bots. */
+  vivos: string[];
+  /** Quiénes quedaron fuera, en orden. */
+  fuera: { quien: string; ronda: number }[];
+  ganador: string | null;
+  /** Quiénes ya llegaron a una silla en la ronda actual. */
+  reclamos: { quien: string; hora: number }[];
+  /** Quiénes se sentaron en la ronda anterior (sin el que quedó fuera), por si la ronda se cerró entre consultas. */
+  anteriores?: { quien: string; hora: number }[];
+}
+
+/** Cómo va la partida. Si ya toca cerrar la ronda, el servidor la cierra al consultar. */
+export async function estadoPartida(sala: string): Promise<EstadoPartida> {
+  const { data, error: e } = await sb().rpc('estado_partida', { p_sala: sala });
+  if (e) throw error(e);
+  return data as EstadoPartida;
+}
+
+/** Sentarse: el servidor anota la hora en que llega. */
+export async function reclamarSilla(sala: string, ronda: number): Promise<EstadoPartida> {
+  const { data, error: e } = await sb().rpc('reclamar_silla', { p_sala: sala, p_ronda: ronda });
+  if (e) throw error(e);
+  return data as EstadoPartida;
+}
+
 // ---------------------------------------------------------------- Amigos y conexión
 export interface Amigo {
   id: string;
