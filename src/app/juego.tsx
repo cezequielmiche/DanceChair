@@ -71,7 +71,8 @@ export default function PantallaJuego() {
       const dt = Math.min(50, t - ultimo);
       ultimo = t;
       g.actualizar(performance.now(), dt);
-      if (t - ultimoDibujo > 66) {
+      // al final, cuando el ganador ya bailó, la interfaz ya no cambia: no se redibuja hasta "Otra vez"
+      if (t - ultimoDibujo > 66 && !g.quieto(performance.now())) {
         ultimoDibujo = t;
         setTic(t);
       }
@@ -241,7 +242,7 @@ export default function PantallaJuego() {
                       <Pulgar size={13} abajo={!p.vivo} />
                     </View>
                   </View>
-                  <Text style={[styles.jugNombre, { color: p.tu ? C.amarillo : C.texto }]} numberOfLines={1}>
+                  <Text style={[styles.jugNombre, { color: p.tu ? C.acento : C.tinta }]} numberOfLines={1}>
                     {p.nombre}
                   </Text>
                 </View>
@@ -255,7 +256,6 @@ export default function PantallaJuego() {
           activo={bailando ? g.baile : null}
           habilitado={puedeBailar}
           onPaso={(_, p) => g.bailar(p.id, performance.now())}
-          onVacio={() => router.push('/pasos')}
         >
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <View
@@ -290,7 +290,7 @@ export default function PantallaJuego() {
       <Modal visible={perdiste} transparent animationType="fade">
         <View style={styles.velo}>
           <View style={styles.modal}>
-            <Avatar3D avatares={[{ config: avatar, anim: 'idle' }]} style={{ width: 120, height: 150 }} girar={false} />
+            <Avatar3D avatares={[{ config: avatar, anim: 'idle' }]} style={{ width: 120, height: 150 }} girar={false} sombras={false} />
             <Text style={styles.modalTitulo}>¡Te quedaste sin silla!</Text>
             <Text style={styles.modalTxt}>
               Terminaste en el puesto {g.puesto} de {g.total}.
@@ -322,17 +322,17 @@ export default function PantallaJuego() {
 }
 
 const styles = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: C.fondo },
+  pantalla: { flex: 1, backgroundColor: C.pantalla },
   arriba: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 6 },
   icono: { width: 44, height: 44, borderRadius: 12, backgroundColor: C.tarjeta, alignItems: 'center', justifyContent: 'center' },
   tarjeta: { flex: 1, minHeight: 64, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   barras: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 26 },
-  titulo: { fontFamily: F.titulo, fontSize: 20, lineHeight: 24 },
+  titulo: { fontFamily: F.titulo, fontSize: 20, lineHeight: 27 },
   msg: { fontFamily: F.texto, fontSize: 13 },
   tag: { position: 'absolute', transform: [{ translateX: -30 }, { translateY: -18 }], minWidth: 60, alignItems: 'center', paddingHorizontal: 7, borderRadius: 10 },
   tagTxt: { fontFamily: F.fuerte, fontSize: 11, lineHeight: 16 },
   filaPista: { position: 'absolute', left: 12, right: 12, bottom: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  stat: { fontFamily: F.fuerte, fontSize: 13, color: C.apagado },
+  stat: { fontFamily: F.fuerte, fontSize: 13, color: C.tinta2 },
   chip: { height: 30, paddingHorizontal: 10, borderRadius: 999, backgroundColor: '#2C3961', flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipTxt: { fontFamily: F.fuerte, fontSize: 13, color: C.texto2 },
   abajo: { alignItems: 'center', justifyContent: 'center' },
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   circulo: { width: 46, height: 46, borderRadius: 23, borderWidth: 3, overflow: 'hidden', alignItems: 'center' },
   cara: { width: 22, height: 22, borderRadius: 11, marginTop: 6 },
   cuerpo: { width: 34, height: 20, borderRadius: 10, marginTop: 2 },
-  pulgar: { position: 'absolute', right: -6, bottom: -4, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: C.fondo, alignItems: 'center', justifyContent: 'center' },
+  pulgar: { position: 'absolute', right: -6, bottom: -4, width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: C.pantalla, alignItems: 'center', justifyContent: 'center' },
   jugNombre: { fontFamily: F.fuerte, fontSize: 11, marginTop: 2 },
   aroPulso: { position: 'absolute', borderWidth: 4 },
   centro: { alignItems: 'center', justifyContent: 'center' },

@@ -158,9 +158,9 @@ function Bloqueado({ texto, onPress }: { texto: string; onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: C.fondo },
+  pantalla: { flex: 1, backgroundColor: C.pantalla },
   cabeza: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12 },
-  titulo: { fontFamily: F.titulo, fontSize: 28, color: C.amarillo },
+  titulo: { fontFamily: F.titulo, fontSize: 28, color: C.tinta },
   chipBtn: { height: 36, paddingHorizontal: 14, borderRadius: 999, backgroundColor: C.tarjeta, justifyContent: 'center' },
   chipTxt: { fontFamily: F.fuerte, fontSize: 13, color: C.texto },
   panel: { padding: 16, gap: 10 },

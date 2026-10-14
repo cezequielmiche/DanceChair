@@ -106,3 +106,23 @@ test('cada jugador queda en una silla distinta', () => {
   assert.equal(new Set(sillas).size, sillas.length);
   assert.equal(sillas.length, 7);
 });
+
+test('al final el ganador baila y después la partida queda quieta', () => {
+  const g = nuevo(3, 'Fácil');
+  const t = { v: 0 };
+  g.iniciar(t.v);
+  for (let r = 0; r < 10 && (g.fase as string) !== 'fin'; r++) {
+    hasta(g, t, () => g.fase === 'alto' || g.fase === 'fin');
+    if ((g.fase as string) === 'fin') break;
+    g.sentarse(t.v);
+    hasta(g, t, () => g.fase === 'resultado' || g.fase === 'fin');
+    if (g.fase === 'resultado') g.siguiente(t.v);
+  }
+  const id = g.ganadorId!;
+  assert.equal(g.quieto(t.v + 1000), false);
+  assert.equal(g.pose(id, g.finEn + 4000).anim, 'dab');
+  assert.equal(g.pose(id, g.finEn + 20000).anim, 'idle');
+  assert.equal(g.quieto(g.finEn + 20000), true);
+  g.iniciar(g.finEn + 20000);
+  assert.equal(g.quieto(g.finEn + 20000), false);
+});

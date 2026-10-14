@@ -2,10 +2,12 @@
 // Arrastrando el dedo se gira. Un solo <Canvas> por visor: los celulares aguantan pocos a la vez.
 import { Canvas, useFrame } from '@react-three/fiber/native';
 import React, { Suspense, useEffect, useMemo, useRef } from 'react';
+import { useIsFocused } from 'expo-router';
 import { PanResponder, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
-import '@/lib/three';
+import { Limitador } from '@/lib/Limitador';
+import { GL_VISOR } from '@/lib/three';
 import { C } from '@/ui/tema';
 import { useModelos } from './modelos';
 import { AvatarRig } from './rig';
@@ -31,9 +33,11 @@ type Props = {
   encuadre?: 'cuerpo' | 'busto';
   girar?: boolean;
   piso?: boolean;
+  /** Sombras: en visores pequeños casi no se notan y le cuestan a la GPU. */
+  sombras?: boolean;
 };
 
-export function Avatar3D({ avatares, style, encuadre = 'cuerpo', girar = true, piso = true }: Props) {
+export function Avatar3D({ avatares, style, encuadre = 'cuerpo', girar = true, piso = true, sombras = true }: Props) {
   'use no memo'; // se anima cada cuadro: fuera del React Compiler
   const giro = useRef({ y: 0.35, base: 0, tocando: false });
   const pan = useMemo(
@@ -57,6 +61,7 @@ export function Avatar3D({ avatares, style, encuadre = 'cuerpo', girar = true, p
       }),
     [girar],
   );
+  const enfocado = useIsFocused();
   const busto = encuadre === 'busto';
   const ancho = avatares.length > 1;
   const cam: [number, number, number] = busto ? [0, 1.12, 1.9] : ancho ? [0, 1.15, 4.7] : [0, 0.9, 4.1];
@@ -65,19 +70,25 @@ export function Avatar3D({ avatares, style, encuadre = 'cuerpo', girar = true, p
   return (
     <View style={[styles.caja, style]} {...pan.panHandlers}>
       <Canvas
-        shadows="percentage"
+        // Las pestañas siguen montadas aunque no se vean: fuera de foco el visor no dibuja nada.
+        // En foco dibuja a 30 cuadros por segundo (ver Limitador), no a 60.
+        frameloop={enfocado ? 'demand' : 'never'}
+        gl={GL_VISOR}
+        shadows={sombras ? 'percentage' : false}
         camera={{ position: cam, fov: busto ? 26 : 30, near: 0.05, far: 50 }}
         onCreated={({ camera, gl }) => {
           camera.lookAt(...mira);
           gl.setClearColor(0x000000, 0);
         }}
       >
-        <hemisphereLight args={['#dfe8ff', '#3a2f50', 1.0]} />
+        <Limitador />
+        <hemisphereLight args={['#dfe8ff', '#8a7fae', 1.2]} />
+        <directionalLight position={[0, 2, 6]} intensity={0.5} />
         <directionalLight
           position={[-2, 3.5, 3]}
           intensity={1.4}
           castShadow
-          shadow-mapSize={[1024, 1024]}
+          shadow-mapSize={[512, 512]}
           shadow-camera-left={-3}
           shadow-camera-right={3}
           shadow-camera-top={3}
@@ -138,7 +149,15 @@ function Grupo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cuerpos, avatares.length, modelos]);
 
-  useEffect(() => () => rigs.current.forEach((r) => r?.liberar()), []);
+  // al limpiar también se vacía la lista: si React vuelve a montar el efecto (recarga en caliente),
+  // los personajes se crean de nuevo en vez de quedarse liberados y fuera de la escena
+  useEffect(
+    () => () => {
+      rigs.current.forEach((r) => r?.liberar());
+      rigs.current = [];
+    },
+    [],
+  );
 
   useFrame((_, dt) => {
     avatares.forEach((a, i) => {

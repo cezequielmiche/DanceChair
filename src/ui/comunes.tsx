@@ -82,7 +82,7 @@ export function Muestras({ colores, valor, onCambio }: { colores: readonly (read
           accessibilityLabel={nombre}
           accessibilityState={{ checked: c === valor }}
           onPress={() => onCambio(c)}
-          style={[styles.muestra, { borderColor: c === valor ? '#FFFFFF' : 'transparent' }]}
+          style={[styles.muestra, { borderColor: c === valor ? C.tinta : 'transparent' }]}
         >
           <View style={[styles.muestraColor, { backgroundColor: c }]} />
         </Pressable>
@@ -95,7 +95,7 @@ export function Interruptor({ titulo, valor, onCambio }: { titulo: string; valor
   return (
     <Pressable accessibilityRole="switch" accessibilityState={{ checked: valor }} onPress={() => onCambio(!valor)} style={styles.interruptor}>
       <Text style={styles.interruptorTxt}>{titulo}</Text>
-      <View style={[styles.riel, { backgroundColor: valor ? C.turquesa : '#3A4877', justifyContent: valor ? 'flex-end' : 'flex-start' }]}>
+      <View style={[styles.riel, { backgroundColor: valor ? C.turquesa : C.fondo, justifyContent: valor ? 'flex-end' : 'flex-start' }]}>
         <View style={styles.bolita} />
       </View>
     </Pressable>
@@ -130,12 +130,13 @@ const styles = StyleSheet.create({
   pestanaTxt: { fontFamily: F.fuerte, fontSize: 14 },
   muestras: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   muestra: { width: 48, height: 48, borderRadius: 24, borderWidth: 3, padding: 3 },
-  muestraColor: { flex: 1, borderRadius: 20 },
+  // borde fino: los colores claros (blanco, piel clara) no se perdían sobre el fondo crema
+  muestraColor: { flex: 1, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(24,33,58,0.18)' },
   interruptor: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, borderBottomWidth: 1, borderColor: C.linea },
   interruptorTxt: { fontFamily: F.fuerte, fontSize: 15, color: C.texto },
   riel: { width: 48, height: 28, borderRadius: 14, padding: 3, flexDirection: 'row' },
   bolita: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#FFFFFF' },
-  etiqueta: { fontFamily: F.fuerte, fontSize: 13, color: C.apagado },
+  etiqueta: { fontFamily: F.fuerte, fontSize: 13, color: C.tinta2 },
   aviso: { position: 'absolute', left: 16, right: 16, top: 64, zIndex: 30, padding: 14, borderRadius: 14, backgroundColor: C.turquesa },
   avisoTxt: { fontFamily: F.fuerte, fontSize: 14, color: C.fondo },
 });

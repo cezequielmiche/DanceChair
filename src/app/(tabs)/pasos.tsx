@@ -51,7 +51,7 @@ export default function MisPasos() {
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <Text style={styles.titulo}>Mis pasos</Text>
         <View style={styles.hero}>
-          <Avatar3D avatares={[{ config: avatar, anim: sel }]} style={{ width: 130, height: 170 }} girar={false} />
+          <Avatar3D avatares={[{ config: avatar, anim: sel }]} style={{ width: 130, height: 170 }} girar={false} sombras={false} />
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={styles.nombre}>{elegido.nombre}</Text>
             <Text style={styles.texto}>{elegido.desc}</Text>
@@ -118,8 +118,8 @@ export default function MisPasos() {
 }
 
 const styles = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: C.fondo },
-  titulo: { fontFamily: F.titulo, fontSize: 28, color: C.amarillo },
+  pantalla: { flex: 1, backgroundColor: C.pantalla },
+  titulo: { fontFamily: F.titulo, fontSize: 28, color: C.tinta },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.tarjeta, borderRadius: 20, padding: 10 },
   nombre: { fontFamily: F.titulo, fontSize: 26, color: C.texto },
   texto: { fontFamily: F.texto, fontSize: 13, color: C.texto2 },

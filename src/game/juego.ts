@@ -45,6 +45,8 @@ const radioSillas = (C: number) => (C === 1 ? 0 : C === 2 ? 0.74 : 1.185);
 const PUNTOS_RONDA = 20;
 const PUNTOS_GANAR = 100;
 const PUNTOS_PASO = 5;
+/** El ganador baila sus 3 pasos al final (ms desde que termina la partida); luego se queda quieto. */
+const FIN_BAILE = 500 + 3 * 3400;
 
 const RANGO_BOTS: Record<Dificultad, [number, number]> = {
   Fácil: [650, 1500],
@@ -328,6 +330,14 @@ export class Juego {
     }
   }
 
+  /**
+   * La partida terminó y el ganador ya acabó de bailar: no cambia nada en pantalla hasta que se toque
+   * "Otra vez". La pista 3D y la interfaz dejan de dibujar (es cuando más se calentaba el teléfono).
+   */
+  quieto(ahora: number) {
+    return this.fase === 'fin' && ahora - this.finEn > FIN_BAILE + 1000;
+  }
+
   /** Qué hace cada avatar en este momento (para la escena 3D). */
   pose(id: number, ahora: number): { anim: AvatarAnim; sentado: boolean; celebra: boolean; fuera: boolean } {
     const j = this.enRonda.indexOf(id);
@@ -337,7 +347,8 @@ export class Juego {
     const desdeFin = ahora - this.finEn;
     if (this.fase === 'fin' && this.ganadorId === id && desdeFin > 500) {
       const pasos: AvatarAnim[] = ['brazos', 'dab', 'macarena'];
-      return { anim: pasos[Math.floor(desdeFin / 3400) % 3], sentado: false, celebra: true, fuera };
+      const anim = desdeFin < FIN_BAILE ? pasos[Math.floor((desdeFin - 500) / 3400)] : 'idle';
+      return { anim, sentado: false, celebra: true, fuera };
     }
     if (reclamo) return { anim: 'idle', sentado: true, celebra: false, fuera };
     if (fuera) return { anim: 'idle', sentado: false, celebra: false, fuera };

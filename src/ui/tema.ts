@@ -1,11 +1,24 @@
 // Colores y tipografías del juego (los mismos del prototipo).
 export const C = {
+  /** Fondo de las pantallas (crema). Las tarjetas siguen en azul marino. */
+  pantalla: '#F5EFE0',
+  /** Texto que va directo sobre el fondo crema. */
+  tinta: '#18213A',
+  tinta2: '#4A5578',
+  /** Enlaces y acentos sobre crema (el amarillo no se lee sobre crema). */
+  acento: '#9A5B00',
+  rayaCrema: '#E0D6BF',
+  /** Azul marino: barra de pestañas y tinta oscura sobre botones amarillos. */
   fondo: '#18213A',
-  tarjeta: '#202B4A',
+  /** Recuadros y tarjetas (antes #202B4A: muy oscuro, costaba ver los detalles). */
+  tarjeta: '#3A4877',
   tarjeta2: '#2C3961',
   borde: '#33406A',
   linea: '#26335A',
   piso: '#223056',
+  /** Piso claro de la pista del juego (donde están las sillas). */
+  pista: '#8CA0D5',
+  pistaAro: '#6B7FB8',
   amarillo: '#FFC233',
   turquesa: '#4ED6B0',
   turquesaFondo: '#1F4A43',
@@ -16,13 +29,17 @@ export const C = {
   lila: '#B18CFF',
   texto: '#E9EEF8',
   texto2: '#C9D3EA',
-  apagado: '#A9B6D6',
-  apagado2: '#8D9AC0',
+  apagado: '#BAC4E0',
+  apagado2: '#A6B1D2',
   amarilloFondo: '#3A3320',
   errorFondo: '#3A2A3A',
   errorTexto: '#FFB3A6',
 };
 
+/**
+ * Tipografías. Baloo (titulo) tiene letras muy altas: si se le pone lineHeight, que sea al menos 1.35 × fontSize,
+ * o iOS recorta la parte de arriba de las letras (pasaba con la "D" de Dino en la tienda).
+ */
 export const F = {
   titulo: 'Baloo2_800ExtraBold',
   tituloMedio: 'Baloo2_600SemiBold',

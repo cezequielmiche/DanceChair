@@ -13,7 +13,20 @@ export interface ModeloGLTF {
 
 const PIERNAS = ['LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg'] as const;
 const X = new THREE.Vector3(1, 0, 0);
+const Z = new THREE.Vector3(0, 0, 1);
 const q = new THREE.Quaternion();
+const qPadre = new THREE.Quaternion();
+const qModelo = new THREE.Quaternion();
+const eje = new THREE.Vector3();
+const hombro = new THREE.Vector3();
+const mano = new THREE.Vector3();
+/**
+ * En el paso "brazos" los brazos suben casi verticales y, con la cabeza grande, las manos quedaban detrás de
+ * ella. Encima de la animación, cada brazo que va más vertical que este ángulo (hombro → mano, visto de
+ * frente) se abre hasta llegar a él: queda una Y. Los que ya van más abiertos no se tocan, así ningún brazo
+ * termina horizontal (girar siempre lo mismo hacía que pareciera que quería volar).
+ */
+const ABRIR_BRAZOS = (30 * Math.PI) / 180;
 
 export class AvatarRig {
   /** Grupo que se mueve y gira en la escena. */
@@ -31,6 +44,9 @@ export class AvatarRig {
   private accion: THREE.AnimationAction | null = null;
   private reposo: Record<string, { hueso: THREE.Object3D; local: THREE.Quaternion; mundo: THREE.Quaternion }> = {};
   private sentado = 0;
+  /** 0..1: cuánto se abren los brazos (sube y baja suave al entrar y salir del paso). */
+  private abrir = 0;
+  private brazos: { hueso: THREE.Object3D; mano: THREE.Object3D; signo: number }[] = [];
   private config: AvatarConfig;
 
   constructor(gltf: ModeloGLTF, config: AvatarConfig) {
@@ -48,6 +64,16 @@ export class AvatarRig {
     PIERNAS.forEach((n) => {
       const h = this.modelo.getObjectByName(n);
       if (h) this.reposo[n] = { hueso: h, local: h.quaternion.clone(), mundo: h.getWorldQuaternion(new THREE.Quaternion()) };
+    });
+    (
+      [
+        ['Left', -1],
+        ['Right', 1],
+      ] as const
+    ).forEach(([lado, signo]) => {
+      const h = this.modelo.getObjectByName(`${lado}Arm`);
+      const m = this.modelo.getObjectByName(`${lado}Hand`);
+      if (h && m) this.brazos.push({ hueso: h, mano: m, signo });
     });
     const y = (n: string) => this.modelo.getObjectByName(n)?.getWorldPosition(new THREE.Vector3()).y ?? 0;
     this.rodilla = y('LeftLeg') || 0.23;
@@ -88,6 +114,23 @@ export class AvatarRig {
 
   actualizar(dt: number) {
     this.mixer.update(dt);
+    this.abrir += ((this.anim === 'brazos' ? 1 : 0) - this.abrir) * Math.min(1, dt * 8);
+    if (this.abrir > 0.01) {
+      // giro alrededor del eje frontal del personaje, pasado al espacio del hombro (que ya movió la animación)
+      eje.copy(Z).applyQuaternion(this.modelo.getWorldQuaternion(qModelo));
+      this.modelo.updateMatrixWorld(true);
+      this.brazos.forEach(({ hueso, mano: m, signo }) => {
+        // ángulo del brazo desde la vertical, visto de frente (en el modelo, girar en +Z lleva el brazo derecho a -x)
+        this.modelo.worldToLocal(hueso.getWorldPosition(hombro));
+        this.modelo.worldToLocal(m.getWorldPosition(mano)).sub(hombro);
+        if (mano.y <= 0) return;
+        const falta = ABRIR_BRAZOS - Math.atan2(-signo * mano.x, mano.y);
+        if (falta <= 0) return;
+        hueso.parent!.getWorldQuaternion(qPadre);
+        q.setFromAxisAngle(eje, signo * falta * this.abrir);
+        hueso.quaternion.premultiply(qPadre.clone().invert().multiply(q).multiply(qPadre));
+      });
+    }
     const k = this.sentado;
     if (k > 0) {
       const girar = (n: string, grados: number) => {

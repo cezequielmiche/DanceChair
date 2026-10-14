@@ -5,11 +5,12 @@ import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import { StyleProp, View, ViewStyle } from 'react-native';
 import * as THREE from 'three';
 
-import '@/lib/three';
+import { Limitador } from '@/lib/Limitador';
+import { GL_VISOR } from '@/lib/three';
 import { useModelos } from '@/avatar/modelos';
 import { AvatarRig } from '@/avatar/rig';
 import { C } from '@/ui/tema';
-import type { Juego } from './juego';
+import { RADIO_ORBITA, type Juego } from './juego';
 
 export interface Etiqueta {
   id: number;
@@ -35,6 +36,8 @@ export function Pista3D({ juego, etiquetas, style }: Props) {
   return (
     <View style={style}>
       <Canvas
+        frameloop="demand"
+        gl={GL_VISOR}
         shadows="percentage"
         camera={{ position: CAM_PISTA.toArray() as [number, number, number], fov: 36, near: 0.1, far: 60 }}
         onCreated={({ camera, gl }) => {
@@ -42,12 +45,14 @@ export function Pista3D({ juego, etiquetas, style }: Props) {
           gl.setClearColor(0x000000, 0);
         }}
       >
-        <hemisphereLight args={['#dfe8ff', '#3a2f50', 0.95]} />
+        <Limitador pausa={juego} />
+        <hemisphereLight args={['#dfe8ff', '#8a7fae', 1.1]} />
+        <directionalLight position={[0, 2, 6]} intensity={0.5} />
         <directionalLight
           position={[-3, 6, 4]}
           intensity={1.1}
           castShadow
-          shadow-mapSize={[1024, 1024]}
+          shadow-mapSize={[512, 512]}
           shadow-camera-left={-3.5}
           shadow-camera-right={3.5}
           shadow-camera-top={3.5}
@@ -56,11 +61,12 @@ export function Pista3D({ juego, etiquetas, style }: Props) {
         <directionalLight position={[3, 3, -4]} intensity={0.5} color="#b18cff" />
         <mesh rotation-x={-Math.PI / 2} receiveShadow>
           <circleGeometry args={[3, 64]} />
-          <meshStandardMaterial color={C.piso} roughness={0.9} />
+          {/* Brilla un poco por sí mismo y sin tone mapping: se ve claro con cualquier luz y aún recibe sombras. */}
+          <meshStandardMaterial color={C.pista} emissive={C.pista} emissiveIntensity={0.6} roughness={0.9} toneMapped={false} />
         </mesh>
         <mesh rotation-x={-Math.PI / 2} position-y={0.005}>
           <ringGeometry args={[1.97, 2.03, 96]} />
-          <meshBasicMaterial color="#3a4877" />
+          <meshBasicMaterial color={C.pistaAro} toneMapped={false} />
         </mesh>
         <Suspense fallback={null}>
           <Escena juego={juego} etiquetas={etiquetas} />
@@ -74,6 +80,8 @@ function Escena({ juego, etiquetas }: { juego: Props['juego']; etiquetas: Props[
   'use no memo'; // se anima cada cuadro: fuera del React Compiler
   const modelos = useModelos();
   const { camera, size, scene } = useThree();
+  // En pantallas angostas (celular vertical) la cámara se aleja para que quepa todo el círculo de jugadores.
+  const camPista = useMemo(() => encuadrePista(size.width / Math.max(1, size.height)), [size.width, size.height]);
   const rigs = useRef<Record<number, AvatarRig>>({});
   const sillas = useRef<THREE.Group[]>([]);
   const mira = useRef(MIRA_PISTA.clone());
@@ -89,8 +97,11 @@ function Escena({ juego, etiquetas }: { juego: Props['juego']; etiquetas: Props[
 
   useEffect(
     () => () => {
+      // también se vacían las listas: si React vuelve a montar el efecto, todo se crea de nuevo
       Object.values(rigs.current).forEach((r) => r.liberar());
+      rigs.current = {};
       sillas.current.forEach((s) => s.removeFromParent());
+      sillas.current = [];
     },
     [],
   );
@@ -198,7 +209,7 @@ function Escena({ juego, etiquetas }: { juego: Props['juego']; etiquetas: Props[
 
     // ---------------- cámara: se acerca al ganador; en otra partida vuelve a la pista
     const k = Math.min(1, dt * 0.0035);
-    let camT = CAM_PISTA;
+    let camT = camPista;
     let lookT = MIRA_PISTA;
     if (ganador != null && posGanador.current && ahora - g.finEn > 300) {
       const [wx, wz] = posGanador.current;
@@ -214,6 +225,29 @@ function Escena({ juego, etiquetas }: { juego: Props['juego']; etiquetas: Props[
 }
 
 /** Silla: asiento a la altura de la rodilla, ancha y con respaldo alto (los personajes son cabezones). */
+/** Posición de cámara (en la misma dirección que CAM_PISTA) más cercana en la que caben todos los jugadores. */
+function encuadrePista(aspecto: number) {
+  const cam = new THREE.PerspectiveCamera(36, aspecto, 0.1, 60);
+  const dir = CAM_PISTA.clone().sub(MIRA_PISTA);
+  const v = new THREE.Vector3();
+  const R = RADIO_ORBITA + 0.3; // medio cuerpo y la etiqueta del nombre
+  for (let k = 1; k < 3; k += 0.05) {
+    cam.position.copy(MIRA_PISTA).addScaledVector(dir, k);
+    cam.lookAt(MIRA_PISTA);
+    cam.updateMatrixWorld();
+    let cabe = true;
+    for (let i = 0; i < 48 && cabe; i++) {
+      const a = (2 * Math.PI * i) / 48;
+      for (const y of [0, 1.25]) {
+        v.set(R * Math.cos(a), y, R * Math.sin(a)).project(cam);
+        if (Math.abs(v.x) > 0.94 || Math.abs(v.y) > 0.96) cabe = false;
+      }
+    }
+    if (cabe) return cam.position.clone();
+  }
+  return MIRA_PISTA.clone().addScaledVector(dir, 3);
+}
+
 function crearSilla(k: number) {
   const g = new THREE.Group();
   g.scale.set(k * 1.7, k, k * 1.45);

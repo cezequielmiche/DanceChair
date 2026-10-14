@@ -38,8 +38,8 @@ export default function Raiz() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.fondo }, animation: 'fade' }}>
+      <StatusBar style="dark" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.pantalla }, animation: 'fade' }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
         <Stack.Screen name="juego" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />

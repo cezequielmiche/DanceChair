@@ -1,4 +1,5 @@
 // Tienda: tocar una prenda te la prueba en tu avatar al instante; si ya es tuya, se queda puesta.
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar3D } from '@/avatar/Avatar3D';
 import type { AvatarAnim } from '@/avatar/types';
 import { articulo, conPrenda, llevaPuesta, PAQUETES, PASOS, PRENDAS, type Articulo } from '@/data/catalogo';
+import { IMAGEN_ARTICULO } from '@/data/imagenes';
 import { comprarPaquete } from '@/lib/compras';
 import { useJugador } from '@/store/jugador';
 import { Aviso, Boton, Pestanas } from '@/ui/comunes';
@@ -112,7 +114,7 @@ export default function Tienda() {
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 4, gap: 12 }}>
         <View style={styles.hero}>
-          <Avatar3D avatares={[{ config: vista, anim }]} encuadre={!esPaso && item.tipo === 'ropa' && item.busto ? 'busto' : 'cuerpo'} style={{ width: 130, height: 160 }} />
+          <Avatar3D avatares={[{ config: vista, anim }]} encuadre={!esPaso && item.tipo === 'ropa' && item.busto ? 'busto' : 'cuerpo'} style={{ width: 130, height: 160 }} sombras={false} />
           <View style={{ flex: 1, gap: 6 }}>
             <Text style={[styles.etq, { color: colorEtq }]}>{etiqueta}</Text>
             <Text style={styles.nombre}>{item.nombre}</Text>
@@ -133,9 +135,7 @@ export default function Tienda() {
             const on = a.tipo === 'ropa' && llevaPuesta(avatar, a);
             return (
               <Pressable key={a.id} onPress={() => tocar(a)} style={[styles.carta, { borderColor: sel === a.id ? C.amarillo : 'transparent' }]} accessibilityLabel={`${a.nombre}${tuyo ? ', tuyo' : `, ${a.precio} monedas`}`}>
-                <View style={[styles.icono, { backgroundColor: a.tipo === 'ropa' ? a.muestra : ETIQUETA_COLOR[a.etiqueta] }]}>
-                  <Text style={styles.iconoTxt}>{a.nombre.slice(0, 1)}</Text>
-                </View>
+                <Image source={IMAGEN_ARTICULO[a.id]} style={styles.imagen} contentFit="contain" />
                 <Text style={styles.cartaNombre} numberOfLines={1}>
                   {a.nombre}
                 </Text>
@@ -152,6 +152,10 @@ export default function Tienda() {
               </Pressable>
             );
           })}
+          {/* huecos invisibles para completar la última fila: así las tarjetas no se separan */}
+          {Array.from({ length: (3 - (lista.length % 3)) % 3 }, (_, i) => (
+            <View key={`hueco${i}`} style={styles.hueco} />
+          ))}
         </View>
         <Text style={styles.nota}>
           {tab === 'ropa'
@@ -214,30 +218,31 @@ export default function Tienda() {
 }
 
 const styles = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: C.fondo },
+  pantalla: { flex: 1, backgroundColor: C.pantalla },
   cabeza: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  titulo: { fontFamily: F.titulo, fontSize: 28, color: C.amarillo },
+  titulo: { fontFamily: F.titulo, fontSize: 28, color: C.tinta },
   monedas: { height: 40, paddingLeft: 8, paddingRight: 12, borderRadius: 999, borderWidth: 2, borderColor: C.borde, backgroundColor: C.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 6 },
   monedasTxt: { fontFamily: F.fuerte, fontSize: 15, color: '#FFF' },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.tarjeta, borderRadius: 20, padding: 8 },
   etq: { fontFamily: F.fuerte, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase' },
-  nombre: { fontFamily: F.titulo, fontSize: 28, lineHeight: 30, color: C.texto },
+  nombre: { fontFamily: F.titulo, fontSize: 28, lineHeight: 38, color: C.texto },
   texto: { fontFamily: F.texto, fontSize: 13, lineHeight: 18, color: C.texto2 },
   chipBtn: { alignSelf: 'flex-start', height: 32, paddingHorizontal: 12, borderRadius: 999, backgroundColor: C.tarjeta2, justifyContent: 'center' },
   chipTxt: { fontFamily: F.fuerte, fontSize: 12, color: C.texto },
   ctaTxt: { fontFamily: F.titulo, fontSize: 22, color: C.fondo },
   error: { padding: 10, borderRadius: 12, backgroundColor: C.errorFondo, color: C.errorTexto, fontFamily: F.fuerte, fontSize: 14 },
-  rejilla: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  carta: { width: '30%', flexGrow: 1, borderRadius: 16, borderWidth: 3, backgroundColor: C.tarjeta, alignItems: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 4 },
-  icono: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.25)' },
-  iconoTxt: { fontFamily: F.titulo, fontSize: 22, color: C.fondo },
+  rejilla: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  // 3 por fila de borde a borde; ancho fijo para que la última fila no se estire
+  carta: { width: '32%', borderRadius: 16, borderWidth: 3, backgroundColor: C.tarjeta, alignItems: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 4 },
+  imagen: { width: '100%', height: 92 },
+  hueco: { width: '32%' },
   cartaNombre: { fontFamily: F.fuerte, fontSize: 14, color: C.texto },
   marca: { fontFamily: F.fuerte, fontSize: 11, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', backgroundColor: C.tarjeta2 },
   marcaFila: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: C.tarjeta2 },
-  nota: { fontFamily: F.texto, fontSize: 12, color: C.apagado2, textAlign: 'center' },
+  nota: { fontFamily: F.texto, fontSize: 12, color: C.tinta2, textAlign: 'center' },
   velo: { flex: 1, backgroundColor: 'rgba(8,12,24,0.6)' },
   hoja: { backgroundColor: C.tarjeta, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36, gap: 12 },
-  asa: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: '#3A4877' },
+  asa: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: C.fondo },
   hojaTitulo: { fontFamily: F.titulo, fontSize: 22, color: C.texto },
   paquete: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, backgroundColor: C.fondo },
 });

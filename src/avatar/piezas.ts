@@ -88,9 +88,12 @@ export function dress(model: THREE.Object3D, c: AvatarConfig) {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const mat = mesh.material as THREE.MeshStandardMaterial;
-    if (mat && mat.name && mat.name in t) {
+    // Blender agrega ".001" a los nombres repetidos: el pelo corto de la chica usa "tint_pelo.001",
+    // la falda del chico "tint_pantalon.001", etc. Sin quitarlo esas piezas ignoraban el color elegido.
+    const nombre = mat?.name?.replace(/\.\d+$/, '');
+    if (nombre && nombre in t) {
       if (!mat.userData.base) mat.userData.base = '#' + mat.color.getHexString();
-      mat.color.set(t[mat.name] ?? mat.userData.base); // r3f maneja sRGB: set() recibe hex normal
+      mat.color.set(t[nombre] ?? mat.userData.base); // r3f maneja sRGB: set() recibe hex normal
     }
     const k = pieceKey(o);
     if (k) (parts[k] ??= []).push(o);

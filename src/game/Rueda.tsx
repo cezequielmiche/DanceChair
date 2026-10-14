@@ -25,6 +25,7 @@ type Props = {
   /** Lugar elegido (en Mis pasos). */
   marcado?: number | null;
   onPaso?: (i: number, p: Paso) => void;
+  /** Tocar un lugar vacío (solo en Mis pasos). Sin esto, los lugares vacíos se ven deshabilitados. */
   onVacio?: (i: number) => void;
   children?: React.ReactNode; // botón central
 };
@@ -59,10 +60,15 @@ export function Rueda({ favoritos, tam, activo, habilitado, marcado, onPaso, onV
           let letra = '#FFFFFF';
           let borde = k.c;
           let guion: string | undefined;
-          if (!p) {
+          if (!p && onVacio) {
             relleno = '#18213A';
             letra = k.c;
             guion = '6 5';
+          } else if (!p) {
+            // en el juego: lugar sin paso, apagado y sin acción (los pasos se eligen en Mis pasos)
+            relleno = '#1C2540';
+            letra = '#5A6585';
+            borde = '#2C3961';
           } else if (on) {
             relleno = k.c;
             letra = k.t;
@@ -77,9 +83,11 @@ export function Rueda({ favoritos, tam, activo, habilitado, marcado, onPaso, onV
           return (
             <React.Fragment key={i}>
               <Path d={d} fill={relleno} stroke={borde} strokeWidth={marcado === i ? 4 : 3} strokeDasharray={guion} />
-              <SvgText fill={letra} fontSize={(p ? 18 : 14) * s} fontFamily={F.titulo} fontWeight="800">
-                <TextPath href={`#arco${i}`} startOffset="50%" textAnchor="middle">
-                  {p ? p.nombre.toUpperCase() : '+ ELEGIR'}
+              {/* textAnchor va en <Text>: en iOS se ignora en <TextPath> y el nombre empezaba a la mitad del arco y se cortaba.
+                  Sin fontWeight: con una fuente propia, iOS cambia a la del sistema si además se pide un peso. */}
+              <SvgText fill={letra} fontSize={(p ? 18 : 14) * s} fontFamily={F.titulo} textAnchor="middle">
+                <TextPath href={`#arco${i}`} startOffset="50%">
+                  {p ? p.nombre.toUpperCase() : onVacio ? '+ ELEGIR' : 'SIN PASO'}
                 </TextPath>
               </SvgText>
             </React.Fragment>
@@ -94,7 +102,8 @@ export function Rueda({ favoritos, tam, activo, habilitado, marcado, onPaso, onV
           <Pressable
             key={i}
             accessibilityRole="button"
-            accessibilityLabel={p ? `Bailar ${p.nombre}` : 'Elegir un paso favorito'}
+            accessibilityLabel={p ? `Bailar ${p.nombre}` : onVacio ? 'Elegir un paso favorito' : 'Lugar sin paso'}
+            accessibilityState={{ disabled: p ? !habilitado : !onVacio }}
             disabled={p ? !habilitado : !onVacio}
             onPress={() => (p ? onPaso?.(i, p) : onVacio?.(i))}
             style={[styles.hit, { width: lado, height: lado, borderRadius: lado / 2, left: cx + RT * Math.cos(m) - lado / 2, top: cy + RT * Math.sin(m) - lado / 2 }]}

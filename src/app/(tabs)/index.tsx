@@ -124,7 +124,7 @@ export default function Inicio() {
                 <View style={styles.podioNombres}>
                   {podio.map((p) => (
                     <View key={p.i} style={styles.escalon}>
-                      <Text style={[styles.escalonPos, { color: ['#FFC233', '#C9D3EA', '#E0A070'][p.i] }]}>#{p.i + 1}</Text>
+                      <Text style={[styles.escalonPos, { color: ['#8A6A00', '#5A6585', '#9A5530'][p.i] }]}>#{p.i + 1}</Text>
                       <Text style={styles.escalonTxt} numberOfLines={1}>
                         {p.fila.tu ? 'Tú' : p.fila.nombre} · {fmt(p.fila.puntos)}
                       </Text>
@@ -133,7 +133,7 @@ export default function Inicio() {
                 </View>
               </View>
             ) : (
-              <Text style={[styles.texto, { textAlign: 'center', padding: 24 }]}>{error || 'Todavía no hay puntos esta semana. ¡Sé el primero!'}</Text>
+              <Text style={[styles.texto, { textAlign: 'center', padding: 24, color: C.tinta2 }]}>{error || 'Todavía no hay puntos esta semana. ¡Sé el primero!'}</Text>
             )}
             <View style={styles.lista}>
               {filas.slice(3).map((f) => (
@@ -165,26 +165,26 @@ export default function Inicio() {
 }
 
 const styles = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: C.fondo },
+  pantalla: { flex: 1, backgroundColor: C.pantalla },
   cabeza: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 10 },
   mini: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: C.amarillo, backgroundColor: C.piso, overflow: 'hidden', alignItems: 'center' },
   miniCara: { width: 24, height: 24, borderRadius: 12, marginTop: 7 },
   miniCuerpo: { width: 36, height: 20, borderRadius: 10, marginTop: 2 },
-  hola: { fontFamily: F.texto, fontSize: 13, color: C.apagado },
-  nombre: { fontFamily: F.titulo, fontSize: 22, lineHeight: 26, color: C.texto },
+  hola: { fontFamily: F.texto, fontSize: 13, color: C.tinta2 },
+  nombre: { fontFamily: F.titulo, fontSize: 22, lineHeight: 30, color: C.tinta },
   monedas: { height: 40, paddingLeft: 8, paddingRight: 12, borderRadius: 999, borderWidth: 2, borderColor: C.borde, backgroundColor: C.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 6 },
   monedasTxt: { fontFamily: F.fuerte, fontSize: 15, color: '#FFF' },
   tarjeta: { backgroundColor: C.tarjeta, borderRadius: 20, padding: 16, gap: 6 },
   filaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   etq: { fontFamily: F.fuerte, fontSize: 13, color: C.apagado },
   chip: { fontFamily: F.fuerte, fontSize: 12, color: C.turquesa, backgroundColor: C.turquesaFondo, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
-  puntos: { fontFamily: F.titulo, fontSize: 44, lineHeight: 50, color: C.amarillo },
+  puntos: { fontFamily: F.titulo, fontSize: 44, lineHeight: 60, color: C.amarillo },
   puesto: { fontFamily: F.fuerte, fontSize: 15, color: C.texto },
   texto: { fontFamily: F.texto, fontSize: 13, color: C.texto2 },
   podioNombres: { flexDirection: 'row', justifyContent: 'space-around', marginTop: -6 },
   escalon: { flex: 1, alignItems: 'center' },
-  escalonPos: { fontFamily: F.titulo, fontSize: 18, lineHeight: 22 },
-  escalonTxt: { fontFamily: F.fuerte, fontSize: 12, color: C.texto, paddingHorizontal: 4 },
+  escalonPos: { fontFamily: F.titulo, fontSize: 18, lineHeight: 24 },
+  escalonTxt: { fontFamily: F.fuerte, fontSize: 12, color: C.tinta, paddingHorizontal: 4 },
   lista: { borderRadius: 16, backgroundColor: C.tarjeta, padding: 4 },
   fila: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 52, paddingHorizontal: 12, borderRadius: 12 },
   filaPos: { width: 40, fontFamily: F.titulo, fontSize: 17, color: C.apagado2 },
