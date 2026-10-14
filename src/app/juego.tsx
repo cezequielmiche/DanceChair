@@ -1,4 +1,4 @@
-// Pantalla del juego contra bots: pista 3D arriba; abajo la rueda de pasos con Sentarse y los jugadores a los lados.
+// Pantalla del juego (contra bots sin conexión; en línea, por ahora también contra bots hasta tener salas): pista 3D arriba; abajo la rueda de pasos con Sentarse y los jugadores a los lados.
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -8,6 +8,7 @@ import { efecto, enSilencio, musicaOff, musicaOn, prepararAudio, setSilencio } f
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
 import { Juego, type Dificultad } from '@/game/juego';
+import { monedasContraBots, type ModoPartida } from '@/game/modo';
 import { Pista3D, type Etiqueta } from '@/game/Pista3D';
 import { Rueda } from '@/game/Rueda';
 import { Boton } from '@/ui/comunes';
@@ -17,7 +18,8 @@ import { useJugador } from '@/store/jugador';
 
 export default function PantallaJuego() {
   'use no memo'; // se anima cada cuadro: fuera del React Compiler
-  const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad }>();
+  const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad; modo?: ModoPartida }>();
+  const modo: ModoPartida = params.modo === 'linea' ? 'linea' : 'bots';
   const { avatar, favoritos, registrarPartida } = useJugador();
   const { width } = useWindowDimensions();
   const favPasos = useMemo(() => favoritos.map((f) => (f ? datosPaso(f) ?? null : null)), [favoritos]);
@@ -64,7 +66,7 @@ export default function PantallaJuego() {
       if (e === 'fuera' || e === 'fin') musicaOff();
       if ((e === 'ganaste' || (e === 'fuera' && g.fase === 'fin')) && !guardada.current) {
         guardada.current = true;
-        registrarPartida(g.resumen()).then(setGanadas);
+        registrarPartida(g.resumen(), modo).then(setGanadas);
       }
     });
     const bucle = (t: number) => {
@@ -104,6 +106,8 @@ export default function PantallaJuego() {
   };
 
   // ---------------- tarjeta de estado
+  // contra bots no hay puntos de ranking: lo que se lleva son monedas
+  const premio = modo === 'bots' ? `${monedasContraBots(g.pts)} monedas` : `${g.pts} pts`;
   let titulo = '';
   let msg = '';
   let fondo = C.tarjeta;
@@ -126,17 +130,17 @@ export default function PantallaJuego() {
     msg = `Se quita una silla. Quedan ${vivos} jugadores.${g.espectando ? ' La siguiente ronda empieza sola.' : ''}`;
   } else if (g.fase === 'fin') {
     if (g.gano) {
-      titulo = `¡Campeón! +${g.pts} pts`;
-      msg = ganadas ? `Fuiste el último con silla. +${ganadas} monedas.` : 'Fuiste el último con silla.';
+      titulo = `¡Campeón! +${premio}`;
+      msg = ganadas && modo === 'linea' ? `Fuiste el último con silla. +${ganadas} monedas.` : 'Fuiste el último con silla.';
       fondo = C.amarillo;
       tinta = C.fondo;
     } else if (g.espectando) {
       titulo = `¡${g.ganador} ganó!`;
-      msg = `Quedaste en el puesto ${g.puesto} de ${g.total} (+${g.pts} pts${ganadas ? `, +${ganadas} monedas` : ''}).`;
+      msg = `Quedaste en el puesto ${g.puesto} de ${g.total} (+${premio}${ganadas && modo === 'linea' ? `, +${ganadas} monedas` : ''}).`;
       fondo = C.amarillo;
       tinta = C.fondo;
     } else {
-      titulo = `Sin silla · +${g.pts} pts`;
+      titulo = `Sin silla · +${premio}`;
       msg = `Puesto ${g.puesto} de ${g.total}.`;
     }
   }
@@ -209,7 +213,7 @@ export default function PantallaJuego() {
               <Text style={styles.chipTxt}>Espectando</Text>
             </View>
           ) : (
-            <Text style={styles.stat}>{g.fase === 'cuenta' ? `${g.total} jugadores` : `Ronda ${g.ronda} · ${vivos} en juego · ${g.pts} pts`}</Text>
+            <Text style={styles.stat}>{g.fase === 'cuenta' ? `${g.total} jugadores${modo === 'bots' ? ' · contra bots' : ''}` : `Ronda ${g.ronda} · ${vivos} en juego · ${premio}`}</Text>
           )}
           {ahora < g.flashHasta ? (
             <View style={[styles.chip, { backgroundColor: C.turquesaFondo }]}>
@@ -296,7 +300,7 @@ export default function PantallaJuego() {
               Terminaste en el puesto {g.puesto} de {g.total}.
             </Text>
             <View style={styles.premio}>
-              <Text style={styles.premioTxt}>+{g.pts} puntos al ranking</Text>
+              {modo === 'linea' ? <Text style={styles.premioTxt}>+{g.pts} puntos al ranking</Text> : null}
               {ganadas != null && ganadas > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Moneda size={16} />

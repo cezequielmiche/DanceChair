@@ -7,6 +7,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { AVATAR_DEFAULT, type AvatarConfig, type DanceId } from '@/avatar/types';
 import { articulo, GRATIS, soloLoQueTiene } from '@/data/catalogo';
 import * as api from '@/lib/api';
+import { monedasContraBots, type ModoPartida } from '@/game/modo';
 import { hayServidor } from '@/lib/supabase';
 
 export type Modo = 'local' | 'cuenta';
@@ -25,6 +26,8 @@ interface Estado {
   tiene: string[];
   favoritos: (DanceId | null)[];
   partidas: PartidaLocal[]; // historial local (para el ranking sin servidor)
+  /** Monedas ganadas contra bots con cuenta, que el servidor todavía no tiene (ya están sumadas en `monedas`). */
+  monedasPendientes: number;
   ultimaGanancia: number;
   cargando: boolean;
   aviso: string;
@@ -37,7 +40,8 @@ interface Estado {
   setFavorito: (i: number, id: DanceId | null) => void;
   comprar: (id: string) => Promise<void>;
   sumarMonedas: (n: number) => void;
-  registrarPartida: (r: { puntos: number; gano: boolean; puesto: number; jugadores: number }) => Promise<number>;
+  /** Guarda el resultado y devuelve las monedas ganadas. Contra bots solo se ganan monedas (no puntos de ranking). */
+  registrarPartida: (r: { puntos: number; gano: boolean; puesto: number; jugadores: number }, modo: ModoPartida) => Promise<number>;
   limpiarAviso: () => void;
 }
 
@@ -49,6 +53,7 @@ const INICIAL = {
   tiene: GRATIS,
   favoritos: ['brazos', 'balanceo', null, null] as (DanceId | null)[],
   partidas: [] as PartidaLocal[],
+  monedasPendientes: 0,
   ultimaGanancia: 0,
   cargando: false,
   aviso: '',
@@ -82,7 +87,7 @@ export const useJugador = create<Estado>()(
             const f = p.favoritos?.[i] ?? null;
             return f && tiene.includes(f) ? f : null;
           });
-          set({ modo: 'cuenta', nombre: p.nombre, avatar, monedas: p.monedas, tiene, favoritos: fav, cargando: false });
+          set({ modo: 'cuenta', nombre: p.nombre, avatar, monedas: p.monedas + get().monedasPendientes, tiene, favoritos: fav, cargando: false });
         } catch (e) {
           set({ cargando: false, aviso: (e as Error).message });
           throw e;
@@ -130,8 +135,18 @@ export const useJugador = create<Estado>()(
 
       sumarMonedas: (n) => set({ monedas: get().monedas + n }),
 
-      registrarPartida: async (r) => {
+      registrarPartida: async (r, modoPartida) => {
         const s = get();
+        if (modoPartida === 'bots') {
+          // TODO(fase 4): subir monedasPendientes al servidor cuando vuelva la conexión
+          const ganadas = monedasContraBots(r.puntos);
+          set({
+            monedas: s.monedas + ganadas,
+            monedasPendientes: s.modo === 'cuenta' ? s.monedasPendientes + ganadas : 0,
+            ultimaGanancia: 0,
+          });
+          return ganadas;
+        }
         const partidas = [...s.partidas, { puntos: r.puntos, gano: r.gano, fecha: Date.now() }].slice(-200);
         if (s.modo === 'cuenta') {
           try {
@@ -161,6 +176,7 @@ export const useJugador = create<Estado>()(
         tiene: s.tiene,
         favoritos: s.favoritos,
         partidas: s.partidas,
+        monedasPendientes: s.monedasPendientes,
         ultimaGanancia: s.ultimaGanancia,
       }),
     },

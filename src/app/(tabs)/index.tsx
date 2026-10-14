@@ -1,13 +1,17 @@
 // Inicio: tus puntos, el ranking (semanal, global, amigos) con el podio en 3D y el botón Jugar.
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNetworkState } from 'expo-network';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
 import { BOTS } from '@/data/bots';
 import * as api from '@/lib/api';
+import { elegirModo, type ModoPartida } from '@/game/modo';
+import { hayInternet } from '@/lib/conexion';
+import { hayServidor } from '@/lib/supabase';
 import { puntosSemana, useJugador } from '@/store/jugador';
 import { Boton, Opciones, Pestanas } from '@/ui/comunes';
 import { Jugar, Moneda } from '@/ui/iconos';
@@ -41,6 +45,9 @@ export default function Inicio() {
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [error, setError] = useState('');
   const [dificultad, setDificultad] = useState<'Fácil' | 'Normal' | 'Difícil'>('Normal');
+  const [revisando, setRevisando] = useState(false);
+  const red = useNetworkState();
+  const sinRed = red.isConnected === false || red.isInternetReachable === false;
   const semana = puntosSemana(partidas);
   const total = partidas.reduce((a, p) => a + p.puntos, 0);
 
@@ -63,6 +70,21 @@ export default function Inicio() {
   }, [modo, tipo, nombre, avatar, semana, total]);
 
   useFocusEffect(cargar);
+
+  // Al tocar Jugar se revisa la conexión: sin internet, contra bots (solo monedas); con internet y cuenta, en línea.
+  const jugar = async () => {
+    if (revisando) return;
+    setRevisando(true);
+    const internet = await hayInternet();
+    setRevisando(false);
+    const abrir = (m: ModoPartida) => router.push({ pathname: '/juego', params: { dificultad, jugadores: '6', modo: m } });
+    const decision = elegirModo({ internet, servidor: hayServidor, cuenta: modo === 'cuenta' });
+    if (decision !== 'sesion') return abrir(decision);
+    Alert.alert('Juega en línea', 'Inicia sesión para jugar contra otras personas y sumar puntos al ranking. Contra bots solo ganas monedas.', [
+      { text: 'Jugar contra bots', onPress: () => abrir('bots') },
+      { text: 'Iniciar sesión', onPress: () => router.push('/login') },
+    ]);
+  };
 
   const yo = filas?.find((f) => f.tu);
   const arriba = yo && filas ? filas.find((f) => f.puesto === yo.puesto - 1) : undefined;
@@ -156,8 +178,9 @@ export default function Inicio() {
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
         <Opciones items={[['Fácil', 'Fácil'], ['Normal', 'Normal'], ['Difícil', 'Difícil']]} valor={dificultad} onCambio={setDificultad} />
-        <Boton grande titulo="Jugar" onPress={() => router.push({ pathname: '/juego', params: { dificultad, jugadores: '6' } })}>
-          <Jugar />
+        {sinRed ? <Text style={styles.sinRed}>Sin conexión: jugarás contra bots y solo ganarás monedas.</Text> : null}
+        <Boton grande titulo={revisando ? 'Revisando conexión…' : 'Jugar'} deshabilitado={revisando} onPress={jugar}>
+          {revisando ? <ActivityIndicator color={C.fondo} /> : <Jugar />}
         </Boton>
       </View>
     </SafeAreaView>
@@ -166,6 +189,7 @@ export default function Inicio() {
 
 const styles = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: C.pantalla },
+  sinRed: { fontFamily: F.fuerte, fontSize: 13, color: C.tinta2, textAlign: 'center' },
   cabeza: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, paddingBottom: 10 },
   mini: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: C.amarillo, backgroundColor: C.piso, overflow: 'hidden', alignItems: 'center' },
   miniCara: { width: 24, height: 24, borderRadius: 12, marginTop: 7 },
