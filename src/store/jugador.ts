@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import * as audio from '@/audio/sonidos';
 import { AVATAR_DEFAULT, type AvatarConfig, type DanceId } from '@/avatar/types';
 import { articulo, GRATIS, soloLoQueTiene } from '@/data/catalogo';
 import * as api from '@/lib/api';
@@ -28,6 +29,8 @@ interface Estado {
   partidas: PartidaLocal[]; // historial local (para el ranking sin servidor)
   /** Monedas ganadas contra bots con cuenta, que el servidor todavía no tiene (ya están sumadas en `monedas`). */
   monedasPendientes: number;
+  /** Música y sonidos apagados: se queda así (aun al cerrar la app o la sesión) hasta que se vuelvan a prender. */
+  silencio: boolean;
   ultimaGanancia: number;
   cargando: boolean;
   aviso: string;
@@ -35,6 +38,7 @@ interface Estado {
   entrarLocal: (nombre?: string) => void;
   entrarConCuenta: () => Promise<void>;
   salir: () => Promise<void>;
+  setSilencio: (v: boolean) => void;
   setNombre: (n: string) => void;
   setAvatar: (a: AvatarConfig) => void;
   setFavorito: (i: number, id: DanceId | null) => void;
@@ -54,6 +58,7 @@ const INICIAL = {
   favoritos: ['brazos', 'balanceo', null, null] as (DanceId | null)[],
   partidas: [] as PartidaLocal[],
   monedasPendientes: 0,
+  silencio: false,
   ultimaGanancia: 0,
   cargando: false,
   aviso: '',
@@ -96,7 +101,12 @@ export const useJugador = create<Estado>()(
 
       salir: async () => {
         if (get().modo === 'cuenta' && hayServidor) await api.salir().catch(() => {});
-        set({ ...INICIAL });
+        set({ ...INICIAL, silencio: get().silencio });
+      },
+
+      setSilencio: (v) => {
+        audio.setSilencio(v);
+        set({ silencio: v });
       },
 
       setNombre: (n) => {
@@ -168,6 +178,10 @@ export const useJugador = create<Estado>()(
     {
       name: 'sillas-jugador',
       storage: createJSONStorage(() => AsyncStorage),
+      // al abrir la app, el audio arranca como se dejó
+      onRehydrateStorage: () => (s) => {
+        if (s) audio.setSilencio(s.silencio);
+      },
       partialize: (s) => ({
         modo: s.modo,
         nombre: s.nombre,
@@ -177,6 +191,7 @@ export const useJugador = create<Estado>()(
         favoritos: s.favoritos,
         partidas: s.partidas,
         monedasPendientes: s.monedasPendientes,
+        silencio: s.silencio,
         ultimaGanancia: s.ultimaGanancia,
       }),
     },

@@ -51,7 +51,8 @@ export async function crearCuenta(correo: string, clave: string, nombre: string)
   const { data, error: e } = await sb().auth.signUp({
     email: correo.trim(),
     password: clave,
-    options: { data: { nombre: nombre.trim().slice(0, 12) } },
+    // el enlace del correo de confirmación abre la app (si no, Supabase manda a localhost:3000)
+    options: { data: { nombre: nombre.trim().slice(0, 12) }, emailRedirectTo: urlDeVuelta() },
   });
   if (e) throw error(e);
   // Si el proyecto pide confirmar el correo, todavía no hay sesión.
@@ -63,9 +64,24 @@ export async function recuperarClave(correo: string) {
   if (e) throw error(e);
 }
 
+/**
+ * A dónde vuelven los enlaces de Supabase (confirmar correo, Google): la pantalla src/app/auth.tsx.
+ * En Expo Go es exp://<ip>:8081/--/auth; en un build propio, sillasbailarinas://auth. Ambas deben estar en
+ * Supabase → Authentication → URL Configuration → Redirect URLs.
+ */
+export function urlDeVuelta() {
+  return AuthSession.makeRedirectUri({ scheme: 'sillasbailarinas', path: 'auth' });
+}
+
+/** Cambia el código que trae un enlace de Supabase por la sesión (inicia sesión en este teléfono). */
+export async function completarEnlace(codigo: string) {
+  const { error: e } = await sb().auth.exchangeCodeForSession(codigo);
+  if (e) throw error(e);
+}
+
 /** Google (y cualquier proveedor OAuth de Supabase) con el navegador del sistema. */
 export async function entrarConGoogle() {
-  const redirectTo = AuthSession.makeRedirectUri({ scheme: 'sillasbailarinas', path: 'auth' });
+  const redirectTo = urlDeVuelta();
   const { data, error: e } = await sb().auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: Platform.OS !== 'web' },

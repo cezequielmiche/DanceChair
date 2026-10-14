@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { efecto, enSilencio, musicaOff, musicaOn, prepararAudio, setSilencio } from '@/audio/sonidos';
+import { efecto, musicaOff, musicaOn, prepararAudio } from '@/audio/sonidos';
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
 import { Juego, type Dificultad } from '@/game/juego';
@@ -20,7 +20,7 @@ export default function PantallaJuego() {
   'use no memo'; // se anima cada cuadro: fuera del React Compiler
   const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad; modo?: ModoPartida }>();
   const modo: ModoPartida = params.modo === 'linea' ? 'linea' : 'bots';
-  const { avatar, favoritos, registrarPartida } = useJugador();
+  const { avatar, favoritos, registrarPartida, silencio: mudo, setSilencio } = useJugador();
   const { width } = useWindowDimensions();
   const favPasos = useMemo(() => favoritos.map((f) => (f ? datosPaso(f) ?? null : null)), [favoritos]);
 
@@ -40,7 +40,6 @@ export default function PantallaJuego() {
   if (!juego.current) juego.current = crear();
   const etiquetas = useRef<Etiqueta[]>([]);
   const [, setTic] = useState(0);
-  const [mudo, setMudo] = useState(enSilencio());
   const [ganadas, setGanadas] = useState<number | null>(null);
   const guardada = useRef(false);
 
@@ -190,7 +189,6 @@ export default function PantallaJuego() {
           accessibilityLabel={mudo ? 'Activar sonido' : 'Silenciar'}
           onPress={() => {
             setSilencio(!mudo);
-            setMudo(!mudo);
             if (mudo && g.fase === 'musica') musicaOn(g.ronda);
           }}
           style={styles.icono}

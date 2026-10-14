@@ -1,5 +1,6 @@
 // Iniciar sesión / crear cuenta. Sin servidor configurado se juega sin cuenta (modo local).
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -13,6 +14,9 @@ import { useJugador } from '@/store/jugador';
 import { Boton } from '@/ui/comunes';
 import { Ojo } from '@/ui/iconos';
 import { C, F } from '@/ui/tema';
+
+// El botón nativo de Apple no viene en Expo Go (sale "Unimplemented component"): solo en un build propio de iPhone.
+const conApple = Platform.OS === 'ios' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 const ELENCO = [
   { config: { ...AVATAR_CHICA, audifonos: 'si' as const }, anim: 'caminar' as const, x: -1.15 },
@@ -147,7 +151,7 @@ export default function Login() {
                 <View style={styles.raya} />
               </View>
               <Boton tipo="secundario" titulo="Continuar con Google" onPress={() => correr(api.entrarConGoogle)} deshabilitado={ocupado} />
-              {Platform.OS === 'ios' ? (
+              {conApple ? (
                 <AppleAuthentication.AppleAuthenticationButton
                   buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
                   buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}

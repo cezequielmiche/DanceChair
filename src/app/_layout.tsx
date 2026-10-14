@@ -42,6 +42,8 @@ export default function Raiz() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.pantalla }, animation: 'fade' }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="ajustes" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="juego" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
       </Stack>
     </SafeAreaProvider>

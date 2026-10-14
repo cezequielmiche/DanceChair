@@ -2,19 +2,17 @@
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNetworkState } from 'expo-network';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
 import { BOTS } from '@/data/bots';
 import * as api from '@/lib/api';
-import { elegirModo, type ModoPartida } from '@/game/modo';
-import { hayInternet } from '@/lib/conexion';
-import { hayServidor } from '@/lib/supabase';
+import { useJugar } from '@/lib/useJugar';
 import { puntosSemana, useJugador } from '@/store/jugador';
 import { Boton, Opciones, Pestanas } from '@/ui/comunes';
-import { Jugar, Moneda } from '@/ui/iconos';
+import { Engrane, Jugar, Moneda } from '@/ui/iconos';
 import { C, F, fmt } from '@/ui/tema';
 
 type Tipo = 'semanal' | 'global' | 'amigos';
@@ -45,7 +43,7 @@ export default function Inicio() {
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [error, setError] = useState('');
   const [dificultad, setDificultad] = useState<'Fácil' | 'Normal' | 'Difícil'>('Normal');
-  const [revisando, setRevisando] = useState(false);
+  const { jugar, revisando } = useJugar();
   const red = useNetworkState();
   const sinRed = red.isConnected === false || red.isInternetReachable === false;
   const semana = puntosSemana(partidas);
@@ -71,20 +69,6 @@ export default function Inicio() {
 
   useFocusEffect(cargar);
 
-  // Al tocar Jugar se revisa la conexión: sin internet, contra bots (solo monedas); con internet y cuenta, en línea.
-  const jugar = async () => {
-    if (revisando) return;
-    setRevisando(true);
-    const internet = await hayInternet();
-    setRevisando(false);
-    const abrir = (m: ModoPartida) => router.push({ pathname: '/juego', params: { dificultad, jugadores: '6', modo: m } });
-    const decision = elegirModo({ internet, servidor: hayServidor, cuenta: modo === 'cuenta' });
-    if (decision !== 'sesion') return abrir(decision);
-    Alert.alert('Juega en línea', 'Inicia sesión para jugar contra otras personas y sumar puntos al ranking. Contra bots solo ganas monedas.', [
-      { text: 'Jugar contra bots', onPress: () => abrir('bots') },
-      { text: 'Iniciar sesión', onPress: () => router.push('/login') },
-    ]);
-  };
 
   const yo = filas?.find((f) => f.tu);
   const arriba = yo && filas ? filas.find((f) => f.puesto === yo.puesto - 1) : undefined;
@@ -111,6 +95,9 @@ export default function Inicio() {
         <Pressable accessibilityLabel="Monedas, ir a la tienda" onPress={() => router.push('/tienda')} style={styles.monedas}>
           <Moneda />
           <Text style={styles.monedasTxt}>{fmt(monedas)}</Text>
+        </Pressable>
+        <Pressable accessibilityLabel="Ajustes" onPress={() => router.push('/ajustes')} style={styles.engrane}>
+          <Engrane />
         </Pressable>
       </View>
 
@@ -179,7 +166,7 @@ export default function Inicio() {
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
         <Opciones items={[['Fácil', 'Fácil'], ['Normal', 'Normal'], ['Difícil', 'Difícil']]} valor={dificultad} onCambio={setDificultad} />
         {sinRed ? <Text style={styles.sinRed}>Sin conexión: jugarás contra bots y solo ganarás monedas.</Text> : null}
-        <Boton grande titulo={revisando ? 'Revisando conexión…' : 'Jugar'} deshabilitado={revisando} onPress={jugar}>
+        <Boton grande titulo={revisando ? 'Revisando conexión…' : 'Jugar'} deshabilitado={revisando} onPress={() => jugar(dificultad)}>
           {revisando ? <ActivityIndicator color={C.fondo} /> : <Jugar />}
         </Boton>
       </View>
@@ -197,6 +184,7 @@ const styles = StyleSheet.create({
   hola: { fontFamily: F.texto, fontSize: 13, color: C.tinta2 },
   nombre: { fontFamily: F.titulo, fontSize: 22, lineHeight: 30, color: C.tinta },
   monedas: { height: 40, paddingLeft: 8, paddingRight: 12, borderRadius: 999, borderWidth: 2, borderColor: C.borde, backgroundColor: C.tarjeta, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  engrane: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.borde, backgroundColor: C.tarjeta, alignItems: 'center', justifyContent: 'center' },
   monedasTxt: { fontFamily: F.fuerte, fontSize: 15, color: '#FFF' },
   tarjeta: { backgroundColor: C.tarjeta, borderRadius: 20, padding: 16, gap: 6 },
   filaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

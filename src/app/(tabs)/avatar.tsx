@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { AVATAR_CHICA, AVATAR_CHICO, type AvatarAnim, type AvatarConfig } from '@/avatar/types';
 import { COLORES } from '@/data/catalogo';
+import { useJugar } from '@/lib/useJugar';
 import { useJugador } from '@/store/jugador';
 import { Boton, Etiqueta, Interruptor, Muestras, Opciones, Pestanas } from '@/ui/comunes';
 import { Candado } from '@/ui/iconos';
@@ -15,7 +16,8 @@ import { C, F } from '@/ui/tema';
 type Tab = 'cuerpo' | 'pelo' | 'ropa' | 'extras';
 
 export default function Creador() {
-  const { avatar: a, setAvatar, nombre, setNombre, tiene, salir, modo } = useJugador();
+  const { avatar: a, setAvatar, nombre, setNombre, tiene } = useJugador();
+  const { jugar, revisando } = useJugar();
   const [tab, setTab] = useState<Tab>('cuerpo');
   const [pose, setPose] = useState<AvatarAnim>('idle');
   const set = <K extends keyof AvatarConfig>(k: K, v: AvatarConfig[K]) => setAvatar({ ...a, [k]: v });
@@ -135,13 +137,11 @@ export default function Creador() {
                 <Muestras colores={COLORES.colorAcc} valor={a.colorAcc} onCambio={(c) => set('colorAcc', c)} />
               </>
             )}
-            <View style={{ height: 16 }} />
-            <Boton tipo="secundario" titulo={modo === 'cuenta' ? 'Cerrar sesión' : 'Salir'} onPress={() => salir().then(() => router.replace('/login'))} />
           </>
         )}
       </ScrollView>
       <View style={{ padding: 16, paddingTop: 8 }}>
-        <Boton titulo="Guardar y jugar" onPress={() => router.push('/juego')} />
+        <Boton titulo={revisando ? 'Revisando conexión…' : 'Guardar y jugar'} deshabilitado={revisando} onPress={() => jugar()} />
       </View>
     </SafeAreaView>
   );
