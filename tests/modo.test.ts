@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { conTopeDiario, diaDe, elegirModo, monedasContraBots } from '../src/game/modo';
+import { conTopeDiario, diaDe, elegirModo, monedasPartida, puntosRanking, type Desempeno } from '../src/game/modo';
 
 test('sin internet se juega contra bots, con o sin cuenta', () => {
   assert.equal(elegirModo({ internet: false, servidor: true, cuenta: true }), 'bots');
@@ -19,10 +19,31 @@ test('con internet y cuenta se juega en línea; sin cuenta se pide iniciar sesi�
   assert.equal(elegirModo({ internet: true, servidor: true, cuenta: false }), 'sesion');
 });
 
-test('contra bots: una moneda por cada 10 puntos', () => {
-  assert.equal(monedasContraBots(0), 0);
-  assert.equal(monedasContraBots(9), 0);
-  assert.equal(monedasContraBots(135), 13);
+// sala de 6: el ganador sobrevive 5 rondas
+const gana = (personasFuera: number, pasos: number): Desempeno => ({ rondas: 5, personasFuera, rondasJugadas: 5, gano: true, hayPersonas: personasFuera > 0, pasos });
+
+test('ganar una sala de 6 da como mucho 35 puntos y 30 monedas', () => {
+  assert.equal(puntosRanking(gana(5, 30)), 35);
+  assert.equal(monedasPartida(gana(5, 30)), 30);
+  assert.equal(puntosRanking(gana(5, 0)), 30);
+  assert.equal(monedasPartida(gana(5, 0)), 26);
+});
+
+test('en el ranking solo cuentan las personas; en las monedas también los bots', () => {
+  assert.equal(puntosRanking(gana(1, 30)), 19);
+  assert.equal(puntosRanking(gana(0, 30)), 5);
+  assert.equal(monedasPartida(gana(0, 30)), 30);
+});
+
+test('los que pierden: 2.º, 4.º y 6.º de 6 bailando lo más posible', () => {
+  const fuera = (ronda: number): Desempeno => ({ rondas: ronda - 1, personasFuera: ronda - 1, rondasJugadas: ronda, gano: false, hayPersonas: true, pasos: 6 * ronda });
+  assert.deepEqual([5, 3, 1].map((r) => [puntosRanking(fuera(r)), monedasPartida(fuera(r))]), [[21, 20], [11, 10], [1, 0]]);
+});
+
+test('los pasos tienen tope: uno por ronda en el ranking, seis por ronda en las monedas', () => {
+  const d: Desempeno = { rondas: 0, personasFuera: 0, rondasJugadas: 1, gano: false, hayPersonas: true, pasos: 100 };
+  assert.equal(puntosRanking(d), 1);
+  assert.equal(monedasPartida(d), 0);
 });
 
 test('tope diario contra bots: no pasa de 150 en el día', () => {

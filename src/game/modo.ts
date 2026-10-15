@@ -9,9 +9,35 @@ export function elegirModo(o: { internet: boolean; servidor: boolean; cuenta: bo
   return o.cuenta ? 'linea' : 'sesion';
 }
 
-/** Monedas por una partida contra bots: una por cada 10 puntos que habría dado. */
-export function monedasContraBots(puntos: number) {
-  return Math.floor(puntos / 10);
+/** Cómo te fue en una partida, para calcular el premio (el servidor hace la misma cuenta en cobrar_partida). */
+export interface Desempeno {
+  /** Rondas que sobreviviste (alguien más quedó fuera mientras seguías). */
+  rondas: number;
+  /** De esas, en cuántas quedó fuera una persona (no un bot). */
+  personasFuera: number;
+  /** Rondas que jugaste, contando en la que quedaste fuera. */
+  rondasJugadas: number;
+  gano: boolean;
+  /** Había otra persona en la sala (si no, ganar no da puntos de ranking). */
+  hayPersonas: boolean;
+  pasos: number;
+}
+
+/**
+ * Puntos de ranking: +4 por cada persona que quedó fuera mientras seguías, +10 por ganar si había otra
+ * persona, y +1 por paso con máximo uno por ronda jugada. Ganar una sala de 6 personas da 35.
+ */
+export function puntosRanking(d: Desempeno) {
+  return 4 * d.personasFuera + (d.gano && d.hayPersonas ? 10 : 0) + Math.min(d.pasos, d.rondasJugadas);
+}
+
+/**
+ * Monedas: +4 por ronda sobrevivida (personas o bots), +6 por ganar y +2 por cada 15 pasos (máximo 6 pasos
+ * por ronda jugada). Ganar una sala de 6 da 30.
+ */
+export function monedasPartida(d: Desempeno) {
+  const pasos = Math.min(d.pasos, 6 * d.rondasJugadas);
+  return 4 * d.rondas + (d.gano ? 6 : 0) + 2 * Math.floor(pasos / 15);
 }
 
 /** Tope de monedas por día jugando contra bots (para que no se junten sin límite). */

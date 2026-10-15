@@ -4,6 +4,23 @@ Registro de lo que se hace en cada sesión: cambios, decisiones y pendientes. Lo
 
 ---
 
+## 14 de octubre de 2026 (noche): Fase 4, recompensas calculadas por el servidor
+
+- **Partida en línea:** `cobrar_partida` calcula puesto, puntos y monedas con lo que arbitró el propio servidor. Del teléfono solo toma los pasos bailados (máximo 6 por ronda jugada). Se cobra una sola vez por sala; si se repite la llamada, devuelve lo mismo.
+- **Bots en salas en línea (decisión del usuario):** los 20 puntos de ranking por ronda solo cuentan si quien quedó fuera era una persona; los +100 por ganar, solo si había otra persona en la sala; los pasos sí cuentan. Las monedas se dan completas (puntos totales / 10).
+- **Contra bots sin internet:** las monedas se guardan por día en el teléfono y `subir_monedas_bots` las sube al iniciar sesión, al volver a la app y después de cada partida. El servidor también aplica el tope de 150 por día y no acepta las de hace más de una semana.
+- **`registrar_partida` cerrada:** el teléfono ya no puede mandar puntos.
+- **Migración:** `20261015000300_recompensas.sql`, ya corrida (verificada con `curl`). **Probado jugando por el usuario: todo bien.**
+- **Nueva escala de premios (decisión del usuario):** los puntos de ranking eran demasiados. Ahora el ganador de una sala de 6 saca como mucho **35 puntos y 30 monedas**:
+  - Ranking: +4 por persona que quedó fuera mientras seguías, +10 por ganar si había otra persona, +1 por paso (máximo uno por ronda jugada).
+  - Monedas (cuentan también los bots): +4 por ronda sobrevivida, +6 por ganar, +2 por cada 15 pasos (máximo 6 pasos por ronda).
+  - La cuenta está en `src/game/modo.ts` (`puntosRanking`, `monedasPartida`) y en `cobrar_partida` (migración `20261015000400_escala_recompensas.sql`, ya corrida). Contra bots sin internet se usa la misma cuenta de monedas, con el tope de 150 por día.
+  - El ranking de ejemplo sin servidor se escaló al 10 %.
+- **Dificultad a Ajustes (pedido del usuario):** ya no está en el inicio. Ahora es "Dificultad de los bots" en Ajustes y se guarda en el teléfono (no se borra al cerrar sesión). Solo cambia a los bots sin internet; en línea todas las salas son Normal para que nadie quede separado por dificultad.
+- **Regalo por registrarse (decisión del usuario):** 250 monedas en vez de 600, para los que se registren de aquí en adelante (migración `20261015000500_monedas_bienvenida.sql`, ya corrida). El modo sin cuenta también empieza con 250.
+
+---
+
 ## 14 de octubre de 2026 (tarde): Fase 3, partida en tiempo real
 
 - **El servidor manda:** decide cuándo empieza cada ronda, cuándo para la música, a qué hora llega cada quien a su silla y quién queda fuera. Los teléfonos solo dibujan y avisan "me senté".
@@ -28,6 +45,7 @@ Registro de lo que se hace en cada sesión: cambios, decisiones y pendientes. Lo
 
 | Commit | Qué incluye |
 |---|---|
+| `bb6115b` | Partida en línea en tiempo real (Fase 3), reloj sincronizado, espectador ve sentarse, podio alineado |
 | `0bc12bc` | Salas en línea (Fase 2), amigos con solicitudes, tope diario de monedas, cuenta regresiva con pitido |
 | `e4f14e0` | Pantalla de Ajustes con Cerrar sesión, sonido que se guarda, enlace de confirmación de correo, botón de Apple oculto en Expo Go |
 | `7f6756a` | Revisar la conexión antes de jugar (Fase 1); regla de oro en `AGENTS.md` |
@@ -65,7 +83,7 @@ Registro de lo que se hace en cada sesión: cambios, decisiones y pendientes. Lo
 1. Revisar conexión y elegir modo: **hecha**.
 2. Salas y emparejamiento: **hecha**.
 3. **Partida en tiempo real: hecha y probada** con dos teléfonos (ver arriba).
-4. Resultados y monedas calculados por el servidor; subir las monedas ganadas sin conexión; que los bots no den puntos de ranking.
+4. **Resultados y monedas calculados por el servidor: hecha y probada** (ver arriba).
 5. Pruebas reales con dos teléfonos.
 
 ### Supabase
@@ -78,14 +96,17 @@ Registro de lo que se hace en cada sesión: cambios, decisiones y pendientes. Lo
   - `20261015000000_partida.sql`
   - `20261015000100_primera_ronda.sql`
   - `20261015000200_reclamos_anteriores.sql`
+  - `20261015000300_recompensas.sql`
+  - `20261015000400_escala_recompensas.sql`
+  - `20261015000500_monedas_bienvenida.sql`
 - **Redirect URLs agregadas:** `exp://**` y `sillasbailarinas://**`, para que el correo de confirmación abra la app.
 - **Cómo se trabajan las migraciones:** primero se prueban en un Postgres local que simula Supabase, después se corren en el SQL Editor y al final se verifican con `curl` usando la clave pública.
 
 ### Pendientes
 - [ ] **Cambiar la Secret key de Supabase** (quedó escrita en el chat). La app no la usa.
-- [ ] Fase 4: resultados y monedas calculados por el servidor.
 - [ ] Probar salas y amigos con dos cuentas (iPhone y Samsung).
 - [ ] Opcional: correo de confirmación en español (Authentication → Emails).
+- [ ] Por decidir: **monedas ganadas sin cuenta.** Hoy solo viven en el teléfono (AsyncStorage `sillas-jugador`), no en la base de datos. Si se borra la app se pierden, y al crear cuenta o iniciar sesión el saldo se reemplaza por el del servidor (también se pierden las compras hechas sin cuenta). Además, el tope diario contra bots (`monedasHoy`) se comparte entre sin cuenta y con cuenta. Opción propuesta: al registrarse, pasar las monedas locales con un tope (por ejemplo, hasta 150 además de las 250 de regalo), sin pasar las compras. El usuario prefirió dejarlo anotado por ahora.
 - [ ] Opcional: configurar el inicio con Google (Google Cloud + Supabase).
 - [ ] Ideas que quedaron sin respuesta:
   - podio del ranking quieto después de bailar unos segundos;

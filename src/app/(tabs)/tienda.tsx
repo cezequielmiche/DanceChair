@@ -160,7 +160,7 @@ export default function Tienda() {
         <Text style={styles.nota}>
           {tab === 'ropa'
             ? 'Toca una prenda y te la pruebas al instante. Si ya es tuya, se queda puesta. Los colores se cambian gratis en el creador.'
-            : 'Tus 4 pasos favoritos van en la rueda del juego (los eliges en Mis pasos). Cada paso que bailas mientras suena la música suma +5 puntos.'}
+            : 'Tus 4 pasos favoritos van en la rueda del juego (los eliges en Mis pasos). Bailar mientras suena la música te da puntos de estilo y monedas extra.'}
         </Text>
       </ScrollView>
 
@@ -188,7 +188,7 @@ export default function Tienda() {
           ) : (
             <>
               <Text style={styles.hojaTitulo}>Conseguir monedas</Text>
-              <Text style={styles.texto}>También ganas monedas jugando: 1 por cada 10 puntos.</Text>
+              <Text style={styles.texto}>También ganas monedas jugando: hasta 30 por partida ganada.</Text>
               {PAQUETES.map((p) => (
                 <View key={p.id} style={styles.paquete}>
                   <Moneda size={34} />

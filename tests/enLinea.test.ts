@@ -71,7 +71,7 @@ test('los reclamos y quién queda fuera llegan del servidor', () => {
   assert.equal(g.fase, 'resultado');
   assert.equal(g.ultimoFuera, 'Ana');
   assert.equal(g.siguienteEn, 12000);
-  assert.equal(g.pts, 20);
+  assert.equal(g.pts, 4);
   // "Siguiente" no adelanta la ronda en línea
   g.siguiente(9000);
   assert.equal(g.fase, 'resultado');
@@ -174,4 +174,28 @@ test('el que mira ve sentarse a todos aunque la ronda se cierre entre dos consul
   const sentados = g.jugadores.filter((p) => g.reclamos[p.id]).map((p) => p.clave);
   assert.deepEqual(sentados.sort(), ['ana', 'bot1']);
   assert.equal(g.ultimoFuera, g.jugadores.find((p) => p.clave === 'bot2')!.nombre);
+});
+
+test('en línea, eliminar bots no da puntos de ranking; eliminar personas sí', () => {
+  const g = nuevo();
+  const r = reloj();
+  g.iniciar(0);
+  aplicarPartida(g, estado({}), r, 0);
+  avanzar(g, 0, 8100);
+  g.sentarse(8100);
+  aplicarPartida(g, estado({ ronda: 2, inicio: 12000, alto: 16000, vivos: ['yo', 'ana', 'bot1'], fuera: [{ quien: 'bot2', ronda: 1 }] }), r, 8700);
+  assert.equal(g.pts, 0);
+  assert.equal(g.monedas, 4, 'eliminar un bot sí da monedas');
+  assert.equal(g.resumen().rondas, 1);
+  avanzar(g, 8700, 16100);
+  g.sentarse(16100);
+  aplicarPartida(g, estado({ ronda: 3, inicio: 20000, alto: 24000, vivos: ['yo', 'bot1'], fuera: [{ quien: 'bot2', ronda: 1 }, { quien: 'ana', ronda: 2 }] }), r, 16700);
+  assert.equal(g.pts, 4);
+  avanzar(g, 16700, 24100);
+  g.sentarse(24100);
+  // gana: había otra persona (Ana), así que los +10 sí cuentan
+  aplicarPartida(g, estado({ estado: 'terminada', ronda: 3, alto: null, vivos: ['yo'], ganador: 'yo', fuera: [{ quien: 'bot2', ronda: 1 }, { quien: 'ana', ronda: 2 }, { quien: 'bot1', ronda: 3 }] }), r, 24500);
+  assert.equal(g.gano, true);
+  assert.equal(g.pts, 14);
+  assert.equal(g.monedas, 3 * 4 + 6);
 });

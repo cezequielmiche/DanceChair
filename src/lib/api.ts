@@ -142,16 +142,33 @@ export async function comprar(itemId: string): Promise<number> {
   return data as number;
 }
 
-export async function registrarPartida(r: { puntos: number; gano: boolean; puesto: number; jugadores: number }) {
-  const { data, error: e } = await sb().rpc('registrar_partida', {
-    p_puntos: r.puntos,
-    p_gano: r.gano,
-    p_puesto: r.puesto,
-    p_jugadores: r.jugadores,
-  });
+export interface Cobro {
+  /** Puntos de ranking (solo cuentan las personas que eliminaste, no los bots). */
+  puntos: number;
+  /** Monedas que ganaste en esta partida. */
+  ganadas: number;
+  gano: boolean;
+  puesto: number;
+  jugadores: number;
+  /** Tus monedas en el servidor después de cobrar. */
+  monedas_total: number;
+}
+
+/**
+ * Cobra una partida en línea: el servidor calcula puesto, puntos y monedas con lo que él arbitró. Del
+ * teléfono solo toma los pasos bailados (con tope). Se puede llamar varias veces: solo cobra la primera.
+ */
+export async function cobrarPartida(sala: string, pasos: number): Promise<Cobro> {
+  const { data, error: e } = await sb().rpc('cobrar_partida', { p_sala: sala, p_pasos: pasos });
   if (e) throw error(e);
-  const fila = (data as { monedas_total: number; ganadas: number }[])[0];
-  return { monedas: fila.monedas_total, ganadas: fila.ganadas };
+  return data as Cobro;
+}
+
+/** Sube las monedas ganadas contra bots en un día (el servidor acepta hasta 150 por día). */
+export async function subirMonedasBots(dia: string, monedas: number): Promise<{ aceptadas: number; monedas_total: number }> {
+  const { data, error: e } = await sb().rpc('subir_monedas_bots', { p_dia: dia, p_monedas: monedas });
+  if (e) throw error(e);
+  return data as { aceptadas: number; monedas_total: number };
 }
 
 export async function ranking(tipo: 'semanal' | 'global' | 'amigos'): Promise<FilaRanking[]> {

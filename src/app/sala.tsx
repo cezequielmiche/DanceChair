@@ -1,6 +1,6 @@
 // Sala de espera en línea: busca una sala, muestra quién va entrando y la cuenta regresiva.
 // Arranca cuando se llena (6) o a los 20 s; los lugares vacíos se completan con bots.
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,10 +16,10 @@ import { C, F } from '@/ui/tema';
 
 const LUGARES = 6;
 const CADA_MS = 1000;
+/** En línea siempre es Normal, para que todos caigan en las mismas salas (la dificultad de Ajustes es para los bots sin internet). */
+const DIFICULTAD: Dificultad = 'Normal';
 
 export default function Sala() {
-  const params = useLocalSearchParams<{ dificultad?: Dificultad }>();
-  const dificultad = params.dificultad ?? 'Normal';
   const avatar = useJugador((s) => s.avatar);
   const [sala, setSala] = useState<api.EstadoSala | null>(null);
   const [error, setError] = useState('');
@@ -53,7 +53,7 @@ export default function Sala() {
       t = setTimeout(revisar, CADA_MS);
     };
     api
-      .buscarSala(dificultad)
+      .buscarSala(DIFICULTAD)
       .then((sid) => {
         id.current = sid;
         return revisar();
@@ -65,7 +65,7 @@ export default function Sala() {
       // si se sale de la pantalla sin que la sala arranque (Cancelar, botón atrás), deja el lugar libre
       if (id.current && !empezo.current) api.salirSala(id.current).catch(() => {});
     };
-  }, [dificultad, intento]);
+  }, [intento]);
 
   // la cuenta regresiva se mueve sola entre consultas
   useEffect(() => {
@@ -79,7 +79,7 @@ export default function Sala() {
   return (
     <SafeAreaView style={styles.pantalla} edges={['top', 'bottom']}>
       <Text style={styles.titulo}>{error ? 'No se pudo entrar' : 'Buscando jugadores…'}</Text>
-      <Text style={styles.sub}>Partida en línea · {dificultad}</Text>
+      <Text style={styles.sub}>Partida en línea</Text>
 
       <Avatar3D avatares={[{ config: avatar, anim: 'brazos' }]} style={styles.visor} girar={false} sombras={false} />
 

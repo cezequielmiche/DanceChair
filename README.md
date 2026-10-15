@@ -32,7 +32,7 @@ Qué crea la migración:
 | Tabla / función | Para qué |
 |---|---|
 | `catalogo` | Precios oficiales de prendas y pasos. |
-| `perfiles` | Nombre, avatar (`AvatarConfig`), 4 pasos favoritos y monedas. Se crea solo al registrarse, con 600 monedas y la ropa gratis. |
+| `perfiles` | Nombre, avatar (`AvatarConfig`), 4 pasos favoritos y monedas. Se crea solo al registrarse, con 250 monedas de regalo y la ropa gratis. |
 | `inventario` | Lo que tiene cada jugador. |
 | `partidas` | Puntos de cada partida (para el ranking). |
 | `amigos` | Para el ranking de amigos. |

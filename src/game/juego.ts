@@ -3,6 +3,7 @@
 import type { AvatarAnim, AvatarConfig, DanceId } from '@/avatar/types';
 import { elegirBots } from '@/data/bots';
 import { paso as datosPaso } from '@/data/catalogo';
+import { monedasPartida, puntosRanking, type Desempeno } from '@/game/modo';
 
 export type Fase = 'cuenta' | 'musica' | 'alto' | 'resultado' | 'fin';
 export type Dificultad = 'Fácil' | 'Normal' | 'Difícil';
@@ -55,9 +56,6 @@ export interface Geometria {
 // Medidas de la pista (metros): los jugadores giran en un círculo de 2 m alrededor de las sillas.
 export const RADIO_ORBITA = 2;
 const radioSillas = (C: number) => (C === 1 ? 0 : C === 2 ? 0.74 : 1.185);
-const PUNTOS_RONDA = 20;
-const PUNTOS_GANAR = 100;
-const PUNTOS_PASO = 5;
 /** El ganador baila sus 3 pasos al final (ms desde que termina la partida); luego se queda quieto. */
 const FIN_BAILE = 500 + 3 * 3400;
 /** En línea: espera entre el resultado de una ronda y la siguiente (ms). */
@@ -71,6 +69,8 @@ const RANGO_BOTS: Record<Dificultad, [number, number]> = {
   Difícil: [230, 700],
 };
 
+const esBot = (p: Jugador) => p.clave.startsWith('bot');
+
 export class Juego {
   fase: Fase = 'cuenta';
   cuenta = 3;
@@ -80,9 +80,12 @@ export class Juego {
   reclamos: Record<number, Reclamo> = {};
   theta = 0;
   andar = 0;
-  pts = 0;
   pasosBailados = 0;
   rondasSobrevividas = 0;
+  /** Rondas sobrevividas en las que quedó fuera una persona (sin servidor, todos cuentan como personas). */
+  personasFuera = 0;
+  /** Ronda en la que quedaste fuera (0 si sigues). */
+  rondaFuera = 0;
   gano = false;
   puesto = 0;
   total = 0;
@@ -163,9 +166,10 @@ export class Juego {
     this.siguienteEn = 0;
     this.cuenta = 3;
     this.ronda = 0;
-    this.pts = 0;
     this.pasosBailados = 0;
     this.rondasSobrevividas = 0;
+    this.personasFuera = 0;
+    this.rondaFuera = 0;
     this.gano = false;
     this.espectando = false;
     this.ganadorId = null;
@@ -282,14 +286,13 @@ export class Juego {
     return this.reclamar(0, ahora);
   }
 
-  /** Tocar un paso de la rueda mientras suena la música: +5 puntos. */
+  /** Tocar un paso de la rueda mientras suena la música (suma estilo: puntos y monedas). */
   bailar(id: DanceId, ahora: number) {
     if (this.fase !== 'musica' || !this.tu.vivo || ahora < this.baileHasta) return false;
     this.baile = id;
     this.baileHasta = ahora + (datosPaso(id)?.dura ?? 1700);
-    this.pts += PUNTOS_PASO;
     this.pasosBailados++;
-    this.flash = `+${PUNTOS_PASO} estilo`;
+    this.flash = '¡Estilo!';
     this.flashHasta = ahora + 1100;
     this.emitir('paso');
     return true;
@@ -302,11 +305,13 @@ export class Juego {
     perdedor.vivo = false;
     this.ultimoFuera = perdedor.nombre;
     if (!perdedor.tu && this.tu.vivo) {
-      this.pts += PUNTOS_RONDA; // al espectar ya no se suman puntos
+      // al espectar ya no se suma nada; en línea, eliminar a un bot no da puntos de ranking (sí monedas)
+      if (!this.opts.remoto || !esBot(perdedor)) this.personasFuera++;
       this.rondasSobrevividas++;
     }
     const vivos = this.jugadores.filter((p) => p.vivo);
     if (perdedor.tu) {
+      this.rondaFuera = this.ronda;
       this.fase = 'fin';
       this.gano = false;
       this.puesto = vivos.length + 1;
@@ -319,7 +324,6 @@ export class Juego {
       if (vivos[0].tu) {
         this.gano = true;
         this.puesto = 1;
-        this.pts += PUNTOS_GANAR;
         this.emitir('ganaste');
       } else this.emitir('fin');
     } else {
@@ -488,10 +492,34 @@ export class Juego {
     return { anim: 'idle', sentado: false, celebra: false, fuera };
   }
 
+  /** Cómo vas (o cómo te fue) para calcular el premio. */
+  get desempeno(): Desempeno {
+    return {
+      rondas: this.rondasSobrevividas,
+      personasFuera: this.personasFuera,
+      rondasJugadas: this.rondaFuera || this.ronda,
+      gano: this.gano,
+      // en línea, ganar solo da puntos de ranking si había otra persona en la sala
+      hayPersonas: !this.opts.remoto || this.jugadores.some((p) => !p.tu && !esBot(p)),
+      pasos: this.pasosBailados,
+    };
+  }
+
+  /** Puntos de ranking que llevas. */
+  get pts() {
+    return puntosRanking(this.desempeno);
+  }
+
+  /** Monedas que llevas. */
+  get monedas() {
+    return monedasPartida(this.desempeno);
+  }
+
   /** Resumen al terminar (para guardar puntos y monedas). */
   resumen() {
     return {
       puntos: this.pts,
+      monedas: this.monedas,
       gano: this.gano,
       puesto: this.gano ? 1 : this.puesto,
       jugadores: this.total,

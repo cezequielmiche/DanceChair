@@ -11,7 +11,7 @@ import { BOTS } from '@/data/bots';
 import * as api from '@/lib/api';
 import { useJugar } from '@/lib/useJugar';
 import { puntosSemana, useJugador } from '@/store/jugador';
-import { Boton, Opciones, Pestanas } from '@/ui/comunes';
+import { Boton, Pestanas } from '@/ui/comunes';
 import { Amigos, Engrane, Jugar, Moneda } from '@/ui/iconos';
 import { C, F, fmt } from '@/ui/tema';
 
@@ -28,10 +28,10 @@ interface Fila {
 function rankingLocal(tipo: Tipo, nombre: string, avatar: AvatarConfig, mios: number): Fila[] {
   const base: [string, number][] =
     tipo === 'global'
-      ? [['Kami', 18420], ['Luna', 16880], ['Max', 15740], ['Coco', 14390], ['Bea', 13950], ['Nina', 9900], ['Pipo', 8200]]
+      ? [['Kami', 1842], ['Luna', 1688], ['Max', 1574], ['Coco', 1439], ['Bea', 1395], ['Nina', 990], ['Pipo', 820]]
       : tipo === 'amigos'
-        ? [['Nina', 1700], ['Pipo', 1920]]
-        : [['Luna', 2480], ['Max', 2310], ['Coco', 2150], ['Pipo', 1920], ['Nina', 1700], ['Tito', 1510], ['Bea', 1390]];
+        ? [['Nina', 170], ['Pipo', 192]]
+        : [['Luna', 248], ['Max', 231], ['Coco', 215], ['Pipo', 192], ['Nina', 170], ['Tito', 151], ['Bea', 139]];
   const filas = base.map(([n, p]) => ({ nombre: n, puntos: p, avatar: BOTS.find((b) => b.nombre === n) ?? AVATAR_DEFAULT, tu: false }));
   filas.push({ nombre, puntos: mios, avatar, tu: true });
   return filas.sort((a, b) => b.puntos - a.puntos).map((f, i) => ({ ...f, puesto: i + 1 }));
@@ -50,7 +50,6 @@ export default function Inicio() {
   const [anchoPodio, setAnchoPodio] = useState(0);
   const [filas, setFilas] = useState<Fila[] | null>(null);
   const [error, setError] = useState('');
-  const [dificultad, setDificultad] = useState<'Fácil' | 'Normal' | 'Difícil'>('Normal');
   const { jugar, revisando } = useJugar();
   const red = useNetworkState();
   const sinRed = red.isConnected === false || red.isInternetReachable === false;
@@ -196,9 +195,8 @@ export default function Inicio() {
       </ScrollView>
 
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, gap: 8 }}>
-        <Opciones items={[['Fácil', 'Fácil'], ['Normal', 'Normal'], ['Difícil', 'Difícil']]} valor={dificultad} onCambio={setDificultad} />
         {sinRed ? <Text style={styles.sinRed}>Sin conexión: jugarás contra bots y solo ganarás monedas.</Text> : null}
-        <Boton grande titulo={revisando ? 'Revisando conexión…' : 'Jugar'} deshabilitado={revisando} onPress={() => jugar(dificultad)}>
+        <Boton grande titulo={revisando ? 'Revisando conexión…' : 'Jugar'} deshabilitado={revisando} onPress={() => jugar()}>
           {revisando ? <ActivityIndicator color={C.fondo} /> : <Jugar />}
         </Boton>
       </View>

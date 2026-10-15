@@ -10,7 +10,7 @@ import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
 import { aplicarPartida, esperaConsulta, Reloj } from '@/game/enLinea';
 import { Juego, type Dificultad } from '@/game/juego';
-import { monedasContraBots, type ModoPartida } from '@/game/modo';
+import { type ModoPartida } from '@/game/modo';
 import * as api from '@/lib/api';
 import { salaGuardada } from '@/lib/salaActual';
 import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
@@ -53,7 +53,9 @@ export default function PantallaJuego() {
   if (!juego.current) juego.current = crear();
   const etiquetas = useRef<Etiqueta[]>([]);
   const [, setTic] = useState(0);
-  const [ganadas, setGanadas] = useState<number | null>(null);
+  // monedas y puntos de ranking de la partida (en línea los calcula el servidor)
+  const [cobro, setCobro] = useState<{ monedas: number; puntos: number } | null>(null);
+  const ganadas = cobro?.monedas ?? null;
   const guardada = useRef(false);
   const reloj = useRef(new Reloj());
 
@@ -78,7 +80,7 @@ export default function PantallaJuego() {
       if (e === 'fuera' || e === 'fin') musicaOff();
       if ((e === 'ganaste' || (e === 'fuera' && g.fase === 'fin')) && !guardada.current) {
         guardada.current = true;
-        registrarPartida(g.resumen(), modo).then(setGanadas);
+        registrarPartida(g.resumen(), modo, params.sala).then(setCobro);
       }
     });
     const bucle = (t: number) => {
@@ -144,15 +146,16 @@ export default function PantallaJuego() {
 
   const otraVez = () => {
     // en línea, otra partida es otra sala
-    if (params.sala) return router.replace({ pathname: '/sala', params: { dificultad: params.dificultad ?? 'Normal' } });
+    if (params.sala) return router.replace('/sala');
     guardada.current = false;
-    setGanadas(null);
+    setCobro(null);
     g.iniciar(performance.now());
   };
 
   // ---------------- tarjeta de estado
   // contra bots no hay puntos de ranking: lo que se lleva son monedas
-  const premio = modo === 'bots' ? `${monedasContraBots(g.pts)} monedas` : `${g.pts} pts`;
+  // en línea, mientras llega lo del servidor se muestra la cuenta del teléfono (con las mismas reglas)
+  const premio = modo === 'bots' ? `${g.monedas} monedas` : `${cobro?.puntos ?? g.pts} pts`;
   let titulo = '';
   let msg = '';
   let fondo = C.tarjeta;
@@ -365,7 +368,7 @@ export default function PantallaJuego() {
               Terminaste en el puesto {g.puesto} de {g.total}.
             </Text>
             <View style={styles.premio}>
-              {modo === 'linea' ? <Text style={styles.premioTxt}>+{g.pts} puntos al ranking</Text> : null}
+              {modo === 'linea' ? <Text style={styles.premioTxt}>+{cobro?.puntos ?? g.pts} puntos al ranking</Text> : null}
               {ganadas != null && ganadas > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Moneda size={16} />

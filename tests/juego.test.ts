@@ -36,18 +36,20 @@ test('cuenta regresiva y empieza la música', () => {
   assert.equal(g.geometria(t.v).C, 5);
 });
 
-test('bailar suma 5 puntos y no deja encimar pasos', () => {
+test('bailar suma estilo (uno por ronda en el ranking) y no deja encimar pasos', () => {
   const g = nuevo();
   const t = { v: 0 };
   g.iniciar(t.v);
   hasta(g, t, () => g.fase === 'musica');
   assert.ok(g.bailar('robot', t.v));
-  assert.equal(g.pts, 5);
+  assert.equal(g.pts, 1);
   assert.equal(g.bailar('brazos', t.v + 100), false);
-  assert.equal(g.pts, 5);
+  assert.ok(g.bailar('brazos', t.v + 2000));
+  assert.equal(g.pasosBailados, 2);
+  assert.equal(g.pts, 1);
 });
 
-test('si te sientas rápido sobrevives y ganas 20 puntos', () => {
+test('si te sientas rápido sobrevives y ganas 4 puntos y 4 monedas', () => {
   const g = nuevo(4, 'Fácil');
   const t = { v: 0 };
   g.iniciar(t.v);
@@ -56,7 +58,8 @@ test('si te sientas rápido sobrevives y ganas 20 puntos', () => {
   hasta(g, t, () => g.fase === 'resultado' || g.fase === 'fin');
   assert.equal(g.fase, 'resultado');
   assert.equal(g.tu.vivo, true);
-  assert.equal(g.pts, 20);
+  assert.equal(g.pts, 4);
+  assert.equal(g.monedas, 4);
   assert.equal(g.jugadores.filter((p) => p.vivo).length, 3);
 });
 
@@ -79,7 +82,7 @@ test('si no te sientas quedas fuera y puedes espectar hasta que haya ganador', (
   assert.equal(pose.celebra, true);
 });
 
-test('ganar la partida da +100 y el resumen cuadra', () => {
+test('ganar la partida da +10 puntos y +6 monedas, y el resumen cuadra', () => {
   const g = nuevo(3, 'Fácil');
   const t = { v: 0 };
   g.iniciar(t.v);
@@ -91,8 +94,8 @@ test('ganar la partida da +100 y el resumen cuadra', () => {
     if (g.fase === 'resultado') g.siguiente(t.v);
   }
   assert.equal(g.gano, true);
-  assert.equal(g.pts, 20 * 2 + 100);
-  assert.deepEqual(g.resumen(), { puntos: 140, gano: true, puesto: 1, jugadores: 3, rondas: 2, pasos: 0 });
+  assert.equal(g.pts, 4 * 2 + 10);
+  assert.deepEqual(g.resumen(), { puntos: 18, monedas: 4 * 2 + 6, gano: true, puesto: 1, jugadores: 3, rondas: 2, pasos: 0 });
 });
 
 test('cada jugador queda en una silla distinta', () => {

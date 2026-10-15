@@ -1,4 +1,4 @@
-// Ajustes (desde el engrane del inicio): tu cuenta, el sonido y cerrar sesión.
+// Ajustes (desde el engrane del inicio): tu cuenta, el sonido, la dificultad de los bots y cerrar sesión.
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -6,12 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import * as api from '@/lib/api';
 import { useJugador } from '@/store/jugador';
-import { Boton, Etiqueta, Interruptor } from '@/ui/comunes';
+import { Boton, Etiqueta, Interruptor, Opciones } from '@/ui/comunes';
 import { Flecha } from '@/ui/iconos';
 import { C, F } from '@/ui/tema';
 
 export default function Ajustes() {
-  const { modo, nombre, salir, silencio, setSilencio } = useJugador();
+  const { modo, nombre, salir, silencio, setSilencio, dificultad, setDificultad } = useJugador();
   const conCuenta = modo === 'cuenta';
   const [correo, setCorreo] = useState('');
 
@@ -52,6 +52,12 @@ export default function Ajustes() {
             valor={!silencio}
             onCambio={(v) => setSilencio(!v)}
           />
+        </View>
+
+        <Etiqueta style={{ color: C.tinta2 }}>Dificultad de los bots</Etiqueta>
+        <View style={[styles.caja, { gap: 12 }]}>
+          <Opciones items={[['Fácil', 'Fácil'], ['Normal', 'Normal'], ['Difícil', 'Difícil']]} valor={dificultad} onCambio={setDificultad} />
+          <Text style={styles.detalle}>Qué tan rápido se sientan los bots cuando juegas sin internet. En las partidas en línea todos juegan en Normal.</Text>
         </View>
 
         <View style={{ height: 16 }} />
