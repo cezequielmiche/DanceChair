@@ -48,6 +48,7 @@ export default function Raiz() {
         <Stack.Screen name="sala" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="ajustes" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="amigos" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="reglas" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="juego" options={{ gestureEnabled: false, animation: 'slide_from_bottom' }} />
       </Stack>
     </SafeAreaProvider>

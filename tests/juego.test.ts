@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { AVATAR_DEFAULT } from '../src/avatar/types';
-import { ESPERA_RONDA, Juego, type Dificultad } from '../src/game/juego';
+import { CASTIGO_ADELANTO, ESPERA_RONDA, Juego, type Dificultad } from '../src/game/juego';
 
 // números al azar repetibles
 function semilla(s: number) {
@@ -47,6 +47,41 @@ test('bailar suma estilo (uno por ronda en el ranking) y no deja encimar pasos',
   assert.ok(g.bailar('brazos', t.v + 2000));
   assert.equal(g.pasosBailados, 2);
   assert.equal(g.pts, 1);
+});
+
+test('tocar Sentarse con la música sonando bloquea la silla un rato (salida en falso)', () => {
+  const g = nuevo(4, 'Fácil');
+  const t = { v: 0 };
+  g.iniciar(t.v);
+  hasta(g, t, () => g.fase === 'musica');
+  // el que toca sin parar mientras suena la música
+  let ultimo = 0;
+  while (g.fase === 'musica') {
+    assert.equal(g.sentarse(t.v), false);
+    ultimo = t.v;
+    t.v += 16;
+    g.actualizar(t.v, 16);
+  }
+  assert.equal(g.fase, 'alto');
+  assert.equal(g.flash, '¡Te adelantaste!');
+  assert.equal(g.sentarse(t.v), false);
+  assert.equal(g.reclamos[0], undefined);
+  assert.ok(g.sentarse(ultimo + CASTIGO_ADELANTO));
+});
+
+test('el castigo no pasa a la ronda siguiente', () => {
+  const g = nuevo(4, 'Fácil');
+  const t = { v: 0 };
+  g.iniciar(t.v);
+  hasta(g, t, () => g.fase === 'musica');
+  g.sentarse(t.v);
+  assert.ok(g.adelantoHasta > 0);
+  hasta(g, t, () => g.fase === 'alto');
+  hasta(g, t, () => g.fase === 'resultado' || g.fase === 'fin');
+  if (g.fase === 'resultado') {
+    g.siguiente(t.v);
+    assert.equal(g.adelantoHasta, 0);
+  }
 });
 
 test('si te sientas rápido sobrevives y ganas 4 puntos y 4 monedas', () => {

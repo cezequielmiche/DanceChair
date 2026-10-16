@@ -1,7 +1,8 @@
-// Ajustes (desde el engrane del inicio): tu cuenta, el sonido, la dificultad de los bots y cerrar sesión.
+// Ajustes (desde el engrane del inicio): tu cuenta, el sonido, la dificultad de los bots, acerca de y cerrar sesión.
+import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import * as api from '@/lib/api';
@@ -60,6 +61,28 @@ export default function Ajustes() {
           <Text style={styles.detalle}>Qué tan rápido se sientan los bots cuando juegas sin internet. En las partidas en línea todos juegan en Normal.</Text>
         </View>
 
+        <Etiqueta style={{ color: C.tinta2 }}>Acerca de</Etiqueta>
+        <View style={[styles.caja, { gap: 12 }]}>
+          <View style={styles.app}>
+            <Image source={require('../../assets/images/icon.png')} style={styles.logo} accessibilityIgnoresInvertColors />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.nombre}>{Constants.expoConfig?.name ?? 'Sillas Bailarinas'}</Text>
+              <Text style={styles.detalle}>Versión {Constants.expoConfig?.version ?? '1.0.0'}</Text>
+            </View>
+          </View>
+          <Text style={styles.detalle}>
+            El juego de las sillas musicales en tu teléfono: baila alrededor de las sillas y, cuando pare la música, toca Sentarse antes que los demás. Juega contra bots
+            sin internet o en salas en línea con tus amigos.
+          </Text>
+          <Text style={styles.detalle}>La música y los sonidos fueron hechos para este juego.</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/reglas')} style={styles.fila}>
+            <Text style={styles.filaTxt}>Reglas del juego</Text>
+            <View style={{ transform: [{ rotate: '180deg' }] }}>
+              <Flecha size={18} color={C.apagado} />
+            </View>
+          </Pressable>
+        </View>
+
         <View style={{ height: 16 }} />
         <Boton tipo="secundario" titulo={conCuenta ? 'Cerrar sesión' : 'Salir'} onPress={cerrarSesion} />
       </ScrollView>
@@ -74,5 +97,9 @@ const styles = StyleSheet.create({
   titulo: { fontFamily: F.titulo, fontSize: 28, lineHeight: 38, color: C.tinta },
   caja: { backgroundColor: C.tarjeta, borderRadius: 16, padding: 16 },
   nombre: { fontFamily: F.fuerte, fontSize: 18, color: C.texto },
+  fila: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.linea },
+  filaTxt: { fontFamily: F.fuerte, fontSize: 16, color: C.texto },
+  app: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  logo: { width: 56, height: 56, borderRadius: 14 },
   detalle: { fontFamily: F.texto, fontSize: 14, color: C.apagado, marginTop: 2 },
 });

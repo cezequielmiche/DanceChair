@@ -59,10 +59,10 @@ export function efecto(e: Efecto) {
   if (!silencio) {
     const p = efectos[e];
     if (p) {
-      try {
-        p.seekTo(0);
-        p.play();
-      } catch {}
+      // `seekTo` es asíncrono: si se toca `play` antes de que termine, un sonido que ya acabó a veces no vuelve a sonar.
+      p.seekTo(0)
+        .then(() => p.play())
+        .catch(() => {});
     }
   }
   if (Platform.OS === 'web') return;

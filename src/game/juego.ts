@@ -63,6 +63,8 @@ export const ESPERA_RONDA = 3000;
 /** En línea: si el reloj se corrige menos que esto (ms), no se vuelve a programar la ronda. */
 const AJUSTE_MIN = 30;
 
+/** Tocar Sentarse con la música sonando bloquea la silla este tiempo (ms): así no gana el que toca sin parar. */
+export const CASTIGO_ADELANTO = 1000;
 const RANGO_BOTS: Record<Dificultad, [number, number]> = {
   Fácil: [650, 1500],
   Normal: [420, 1050],
@@ -100,6 +102,10 @@ export class Juego {
   baileHasta = 0;
   flash = '';
   flashHasta = 0;
+  /** El aviso es un regaño (te adelantaste) y no un premio. */
+  flashMal = false;
+  /** Hasta cuándo no puedes sentarte por haber tocado Sentarse antes del alto. */
+  adelantoHasta = 0;
   /** Sube con cada cambio importante (para que la pantalla sepa cuándo redibujar). */
   version = 0;
 
@@ -201,6 +207,7 @@ export class Juego {
     this.fase = 'musica';
     this.baileHasta = 0;
     this.flashHasta = 0;
+    this.adelantoHasta = 0;
     if (!this.opts.remoto) {
       const dura = 3000 + this.rnd() * 5500;
       this.en(ahora, dura, (t) => this.pararMusica(t));
@@ -281,8 +288,17 @@ export class Juego {
     return true;
   }
 
-  /** Botón Sentarse. */
+  /** Botón Sentarse. Si la música aún suena, es una salida en falso: te deja sin poder sentarte un rato. */
   sentarse(ahora: number) {
+    if (this.fase === 'musica' && this.tu.vivo && !this.espectando) {
+      this.adelantoHasta = ahora + CASTIGO_ADELANTO;
+      this.flash = '¡Te adelantaste!';
+      this.flashMal = true;
+      this.flashHasta = ahora + 1100;
+      this.version++;
+      return false;
+    }
+    if (ahora < this.adelantoHasta) return false;
     return this.reclamar(0, ahora);
   }
 
@@ -293,6 +309,7 @@ export class Juego {
     this.baileHasta = ahora + (datosPaso(id)?.dura ?? 1700);
     this.pasosBailados++;
     this.flash = '¡Estilo!';
+    this.flashMal = false;
     this.flashHasta = ahora + 1100;
     this.emitir('paso');
     return true;

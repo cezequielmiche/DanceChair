@@ -67,6 +67,7 @@ export default function PantallaJuego() {
     const g = juego.current;
     prepararAudio().then(() => g.iniciar(performance.now()));
     const quitar = g.on((e) => {
+      if (e === 'musica') musicaOn(g.ronda);
       if (e === 'alto') {
         musicaOff();
         efecto('alto');
@@ -138,7 +139,10 @@ export default function PantallaJuego() {
   const ahora = performance.now();
   const tu = g.tu;
   const sentado = !!g.reclamos[0];
-  const puedeSentarse = g.fase === 'alto' && !sentado && tu.vivo;
+  const castigado = ahora < g.adelantoHasta;
+  const puedeSentarse = g.fase === 'alto' && !sentado && tu.vivo && !castigado;
+  // con la música sonando el botón se ve apagado pero sí recibe toques (para castigar la salida en falso)
+  const tocaAntes = g.fase === 'musica' && tu.vivo && !g.espectando;
   const bailando = g.fase === 'musica' && ahora < g.baileHasta;
   const puedeBailar = g.fase === 'musica' && tu.vivo && !bailando;
   const vivos = g.jugadores.filter((p) => p.vivo).length;
@@ -276,8 +280,8 @@ export default function PantallaJuego() {
             <Text style={styles.stat}>{g.fase === 'cuenta' ? `${g.total} jugadores${modo === 'bots' ? ' · contra bots' : ''}` : `Ronda ${g.ronda} · ${vivos} en juego · ${premio}`}</Text>
           )}
           {ahora < g.flashHasta ? (
-            <View style={[styles.chip, { backgroundColor: C.turquesaFondo }]}>
-              <Text style={[styles.chipTxt, { color: C.turquesa, fontSize: 14 }]}>{g.flash}</Text>
+            <View style={[styles.chip, { backgroundColor: g.flashMal ? C.errorFondo : C.turquesaFondo }]}>
+              <Text style={[styles.chipTxt, { color: g.flashMal ? C.errorTexto : C.turquesa, fontSize: 14 }]}>{g.flash}</Text>
             </View>
           ) : null}
         </View>
@@ -337,7 +341,7 @@ export default function PantallaJuego() {
             <Pressable
               accessibilityRole={enEspera ? 'text' : 'button'}
               accessibilityLabel={enEspera ? `La siguiente ronda empieza en ${faltaRonda} segundos` : etiquetaCentro}
-              disabled={!centroOn}
+              disabled={!centroOn && !tocaAntes}
               onPress={alCentro}
               style={[
                 styles.centro,
