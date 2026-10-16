@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
 import { BOTS } from '@/data/bots';
+import { conSigno } from '@/game/modo';
 import * as api from '@/lib/api';
 import { useJugar } from '@/lib/useJugar';
 import { puntosSemana, useJugador } from '@/store/jugador';
@@ -136,14 +137,16 @@ export default function Inicio() {
         <View style={styles.tarjeta}>
           <View style={styles.filaEntre}>
             <Text style={styles.etq}>Tus puntos esta semana</Text>
-            {ultimaGanancia > 0 || ultimasMonedas > 0 ? (
+            {ultimaGanancia !== 0 || ultimasMonedas > 0 ? (
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                {ultimaGanancia > 0 ? <Text style={styles.chip}>+{ultimaGanancia} última partida</Text> : null}
+                {ultimaGanancia !== 0 ? (
+                  <Text style={[styles.chip, ultimaGanancia < 0 && { color: C.errorTexto, backgroundColor: C.errorFondo }]}>{conSigno(ultimaGanancia)} última partida</Text>
+                ) : null}
                 {ultimasMonedas > 0 ? (
                   <View style={styles.chipMonedas}>
                     <Moneda size={13} />
                     <Text style={styles.chipMonedasTxt}>
-                      +{ultimasMonedas} monedas{ultimaGanancia > 0 ? '' : ' última partida'}
+                      +{ultimasMonedas} monedas{ultimaGanancia !== 0 ? '' : ' última partida'}
                     </Text>
                   </View>
                 ) : null}

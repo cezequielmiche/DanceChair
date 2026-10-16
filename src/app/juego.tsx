@@ -10,7 +10,7 @@ import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
 import { aplicarPartida, esperaConsulta, Reloj } from '@/game/enLinea';
 import { Juego, PAUSA_PERDER, type Dificultad } from '@/game/juego';
-import { type ModoPartida } from '@/game/modo';
+import { conSigno, type ModoPartida } from '@/game/modo';
 import * as api from '@/lib/api';
 import { salaGuardada } from '@/lib/salaActual';
 import { AVATAR_DEFAULT, type AvatarConfig } from '@/avatar/types';
@@ -165,7 +165,8 @@ export default function PantallaJuego() {
   // ---------------- tarjeta de estado
   // contra bots no hay puntos de ranking: lo que se lleva son monedas
   // en línea, mientras llega lo del servidor se muestra la cuenta del teléfono (con las mismas reglas)
-  const premio = modo === 'bots' ? `${g.monedas} monedas` : `${cobro?.puntos ?? g.pts} pts`;
+  const puntos = cobro?.puntos ?? g.pts;
+  const premio = modo === 'bots' ? `+${g.monedas} monedas` : `${conSigno(puntos)} pts`;
   let titulo = '';
   let msg = '';
   let fondo = C.tarjeta;
@@ -188,7 +189,7 @@ export default function PantallaJuego() {
     msg = `Se quita una silla. Quedan ${vivos} jugadores.${g.espectando || g.siguienteEn ? ' La siguiente ronda empieza sola.' : ''}`;
   } else if (g.fase === 'fin') {
     if (g.gano) {
-      titulo = `¡Campeón! +${premio}`;
+      titulo = `¡Campeón! ${premio}`;
       msg = ganadas && modo === 'linea' ? `Fuiste el último con silla. +${ganadas} monedas.` : 'Fuiste el último con silla.';
       fondo = C.amarillo;
       tinta = C.fondo;
@@ -199,11 +200,11 @@ export default function PantallaJuego() {
       tinta = C.fondo;
     } else if (g.espectando) {
       titulo = `¡${g.ganador} ganó!`;
-      msg = `Quedaste en el puesto ${g.puesto} de ${g.total} (+${premio}${ganadas && modo === 'linea' ? `, +${ganadas} monedas` : ''}).`;
+      msg = `Quedaste en el puesto ${g.puesto} de ${g.total} (${premio}${ganadas && modo === 'linea' ? `, +${ganadas} monedas` : ''}).`;
       fondo = C.amarillo;
       tinta = C.fondo;
     } else {
-      titulo = `Sin silla · +${premio}`;
+      titulo = `Sin silla · ${premio}`;
       msg = `Puesto ${g.puesto} de ${g.total}.`;
     }
   }
@@ -388,7 +389,7 @@ export default function PantallaJuego() {
               Terminaste en el puesto {g.puesto} de {g.total}.
             </Text>
             <View style={styles.premio}>
-              {modo === 'linea' ? <Text style={styles.premioTxt}>+{cobro?.puntos ?? g.pts} puntos al ranking</Text> : null}
+              {modo === 'linea' ? <Text style={[styles.premioTxt, puntos < 0 && { color: C.errorTexto }]}>{conSigno(puntos)} puntos al ranking</Text> : null}
               {ganadas != null && ganadas > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Moneda size={16} />

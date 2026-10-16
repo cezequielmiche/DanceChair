@@ -37,11 +37,22 @@ test('en el ranking solo cuentan las personas; en las monedas también los bots'
 
 test('los que pierden: 2.º, 4.º y 6.º de 6 bailando lo más posible', () => {
   const fuera = (ronda: number): Desempeno => ({ rondas: ronda - 1, personasFuera: ronda - 1, rondasJugadas: ronda, gano: false, hayPersonas: true, pasos: 6 * ronda });
-  assert.deepEqual([5, 3, 1].map((r) => [puntosRanking(fuera(r)), monedasPartida(fuera(r))]), [[21, 20], [11, 10], [1, 0]]);
+  assert.deepEqual([5, 3].map((r) => [puntosRanking(fuera(r)), monedasPartida(fuera(r))]), [[21, 20], [11, 10]]);
+});
+
+test('quedar fuera en la ronda 1 o 2 quita 3 puntos y no da monedas (aunque bailes)', () => {
+  const fuera = (ronda: number, jugadores = 6): Desempeno => ({ rondas: ronda - 1, personasFuera: ronda - 1, rondasJugadas: ronda, gano: false, hayPersonas: true, pasos: 12, jugadores });
+  assert.deepEqual([1, 2].map((r) => [puntosRanking(fuera(r)), monedasPartida(fuera(r))]), [[-3, 0], [-3, 0]]);
+  // la ronda 3 ya cuenta normal
+  assert.deepEqual([puntosRanking(fuera(3)), monedasPartida(fuera(3))], [11, 8]);
+  // partidas chicas (menos de 5) no se castigan
+  assert.equal(puntosRanking(fuera(2, 4)), 6);
+  // mientras sigues jugando no se ve el castigo
+  assert.equal(puntosRanking({ ...fuera(1), sigue: true }), 1);
 });
 
 test('los pasos tienen tope: uno por ronda en el ranking, seis por ronda en las monedas', () => {
-  const d: Desempeno = { rondas: 0, personasFuera: 0, rondasJugadas: 1, gano: false, hayPersonas: true, pasos: 100 };
+  const d: Desempeno = { rondas: 0, personasFuera: 0, rondasJugadas: 1, gano: false, hayPersonas: true, pasos: 100, sigue: true };
   assert.equal(puntosRanking(d), 1);
   assert.equal(monedasPartida(d), 0);
 });

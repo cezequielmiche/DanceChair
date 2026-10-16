@@ -21,6 +21,23 @@ export interface Desempeno {
   /** Había otra persona en la sala (si no, ganar no da puntos de ranking). */
   hayPersonas: boolean;
   pasos: number;
+  /** Cuántos jugaron (contándote). Sin dato se toma una sala de 6. */
+  jugadores?: number;
+  /** Todavía no quedas fuera (la cuenta que se ve durante la partida). */
+  sigue?: boolean;
+}
+
+/** Castigo por quedar fuera en las primeras rondas (puntos de ranking). */
+export const CASTIGO_TEMPRANO = 3;
+
+/** ¿Quedó fuera en la ronda 1 o 2 de una partida de 5 o más? (no gana nada y pierde puntos). */
+export function salioTemprano(d: Desempeno) {
+  return !d.gano && !d.sigue && d.rondasJugadas <= 2 && (d.jugadores ?? 6) >= 5;
+}
+
+/** "+5", "−3", "+0". */
+export function conSigno(n: number) {
+  return n < 0 ? `−${-n}` : `+${n}`;
 }
 
 /**
@@ -28,6 +45,8 @@ export interface Desempeno {
  * persona, y +1 por paso con máximo uno por ronda jugada. Ganar una sala de 6 personas da 35.
  */
 export function puntosRanking(d: Desempeno) {
+  // el servidor además no deja que tus puntos de la semana bajen de 0
+  if (salioTemprano(d)) return -CASTIGO_TEMPRANO;
   return 4 * d.personasFuera + (d.gano && d.hayPersonas ? 10 : 0) + Math.min(d.pasos, d.rondasJugadas);
 }
 
@@ -36,6 +55,7 @@ export function puntosRanking(d: Desempeno) {
  * por ronda jugada). Ganar una sala de 6 da 30.
  */
 export function monedasPartida(d: Desempeno) {
+  if (salioTemprano(d)) return 0;
   const pasos = Math.min(d.pasos, 6 * d.rondasJugadas);
   return 4 * d.rondas + (d.gano ? 6 : 0) + 2 * Math.floor(pasos / 15);
 }

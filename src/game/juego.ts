@@ -556,6 +556,8 @@ export class Juego {
       // en línea, ganar solo da puntos de ranking si había otra persona en la sala
       hayPersonas: !this.opts.remoto || this.jugadores.some((p) => !p.tu && !esBot(p)),
       pasos: this.pasosBailados,
+      jugadores: this.total,
+      sigue: this.tu.vivo && !this.gano,
     };
   }
 

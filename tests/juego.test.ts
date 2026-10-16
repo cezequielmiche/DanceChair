@@ -107,11 +107,14 @@ test('si no te sientas quedas fuera y puedes espectar hasta que haya ganador', (
   assert.equal(g.tu.vivo, false);
   assert.equal(g.puesto, 5);
   assert.ok(g.puedeEspectar);
+  // salió en la ronda 1 de 5: −3 puntos y nada de monedas
+  assert.equal(g.pts, -3);
+  assert.equal(g.monedas, 0);
   g.espectar(t.v);
   hasta(g, t, () => g.fase === 'fin' && g.ganadorId != null, 120000);
   assert.equal(g.jugadores.filter((p) => p.vivo).length, 1);
   assert.notEqual(g.ganadorId, 0);
-  assert.equal(g.pts, 0, 'al espectar no se suman puntos');
+  assert.equal(g.pts, -3, 'al espectar no cambian los puntos');
   // el ganador celebra bailando
   const pose = g.pose(g.ganadorId!, t.v + 1000);
   assert.equal(pose.celebra, true);
