@@ -38,9 +38,16 @@ export function aplicarPartida(g: Juego, e: EstadoPartida, reloj: Reloj, ahora: 
   if (e.estado === 'jugando' && e.inicio != null && e.alto != null) g.programarRonda(e.ronda, reloj.local(e.inicio), reloj.local(e.alto), ahora);
 }
 
-/** Cada cuánto consultar: seguido cerca del alto y mientras se reparten las sillas; si no, cada segundo. */
+/**
+ * Cada cuánto consultar: seguido cerca del alto y mientras se reparten las sillas; cada segundo en los últimos
+ * 3 s antes del alto; si no, cada 2 s (cada consulta es carga para el servidor y la ronda ya está programada).
+ */
 export function esperaConsulta(g: Juego, e: EstadoPartida | null, reloj: Reloj, ahora: number) {
   if (!e || e.estado !== 'jugando') return 1000;
-  const alto = e.alto != null ? reloj.local(e.alto) : Infinity;
-  return g.fase === 'alto' || (alto - ahora < 600 && g.fase !== 'fin') ? 250 : 1000;
+  if (g.fase === 'alto') return 250;
+  // ya perdiste y no estás mirando: solo falta saber cómo termina
+  if (g.fase === 'fin') return 2000;
+  const falta = e.alto != null ? reloj.local(e.alto) - ahora : Infinity;
+  if (falta < 600) return 250;
+  return falta > 3000 ? 2000 : 1000;
 }

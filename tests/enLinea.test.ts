@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { AVATAR_DEFAULT } from '../src/avatar/types';
-import { aplicarPartida, Reloj } from '../src/game/enLinea';
+import { aplicarPartida, esperaConsulta, Reloj } from '../src/game/enLinea';
 import { Juego } from '../src/game/juego';
 import type { EstadoPartida } from '../src/lib/api';
 
@@ -198,4 +198,20 @@ test('en línea, eliminar bots no da puntos de ranking; eliminar personas sí', 
   assert.equal(g.gano, true);
   assert.equal(g.pts, 14);
   assert.equal(g.monedas, 3 * 4 + 6);
+});
+
+test('consulta cada 2 s lejos del alto, cada segundo cerca y cada 250 ms en el alto', () => {
+  const g = nuevo();
+  const r = reloj();
+  g.iniciar(0);
+  const e = estado({});
+  aplicarPartida(g, e, r, 0);
+  assert.equal(esperaConsulta(g, null, r, 0), 1000);
+  assert.equal(esperaConsulta(g, e, r, 0), 2000);
+  assert.equal(esperaConsulta(g, e, r, 6000), 1000);
+  assert.equal(esperaConsulta(g, e, r, 7500), 250);
+  avanzar(g, 0, 8100);
+  assert.equal(g.fase, 'alto');
+  assert.equal(esperaConsulta(g, e, r, 8100), 250);
+  assert.equal(esperaConsulta(g, { ...e, estado: 'terminada' }, r, 9000), 1000);
 });
