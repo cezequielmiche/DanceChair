@@ -5,8 +5,8 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar3D } from '@/avatar/Avatar3D';
-import { AVATAR_CHICA, AVATAR_CHICO, type AvatarAnim, type AvatarConfig } from '@/avatar/types';
-import { COLORES } from '@/data/catalogo';
+import { AVATAR_CHICA, AVATAR_CHICO, type AvatarAnim, type AvatarConfig, type CamisaTipo, type Disfraz } from '@/avatar/types';
+import { COLORES, PRENDAS } from '@/data/catalogo';
 import { useJugar } from '@/lib/useJugar';
 import { useJugador } from '@/store/jugador';
 import { Boton, Etiqueta, Interruptor, Muestras, Opciones, Pestanas } from '@/ui/comunes';
@@ -23,30 +23,11 @@ export default function Creador() {
   const set = <K extends keyof AvatarConfig>(k: K, v: AvatarConfig[K]) => setAvatar({ ...a, [k]: v });
   const tieneLentes = tiene.includes('lentes');
   const tieneAudif = tiene.includes('audifonos');
-  const tieneDino = tiene.includes('dino');
-
-  const alAzar = () => {
-    const r = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
-    const col = (k: string) => r(COLORES[k])[0];
-    setAvatar({
-      cuerpo: Math.random() < 0.5 ? 'hombre' : 'mujer',
-      piel: col('piel'),
-      colorOjos: col('colorOjos'),
-      pelo: r(['corto', 'largo', 'ninguno'] as const),
-      colorPelo: col('colorPelo'),
-      camisaTipo: r(['chaqueta', 'blusa'] as const),
-      camisa: col('camisa'),
-      pantalonTipo: r(['jeans', 'falda'] as const),
-      pantalon: col('pantalon'),
-      zapatos: r(['tenis', 'zapatos'] as const),
-      colorZapatos: col('colorZapatos'),
-      lentes: tieneLentes && Math.random() < 0.4 ? 'si' : 'no',
-      audifonos: tieneAudif && Math.random() < 0.4 ? 'si' : 'no',
-      colorAcc: col('colorAcc'),
-      disfraz: tieneDino && Math.random() < 0.2 ? 'dino' : 'ninguno',
-      colorDisfraz: col('colorDisfraz'),
-    });
-  };
+  const disfraces = PRENDAS.filter((p) => p.slot === 'disfraz');
+  const misDisfraces = disfraces.filter((p) => tiene.includes(p.id));
+  const arriba = partesDeArriba(tiene);
+  const arribaPago = PRENDAS.filter((p) => p.slot === 'camisaTipo' && p.precio > 0);
+  const alAzar = () => setAvatar(avatarAlAzar(tiene));
 
   return (
     <SafeAreaView style={styles.pantalla} edges={['top']}>
@@ -93,7 +74,12 @@ export default function Creador() {
         {tab === 'ropa' && (
           <>
             <Etiqueta>Parte de arriba</Etiqueta>
-            <Opciones items={[['chaqueta', 'Chaqueta'], ['blusa', 'Blusa']]} valor={a.camisaTipo ?? 'chaqueta'} onCambio={(v) => set('camisaTipo', v)} />
+            <Opciones items={arriba} valor={a.camisaTipo ?? (a.cuerpo === 'mujer' ? 'blusa' : 'chaqueta')} onCambio={(v) => set('camisaTipo', v)} />
+            {arribaPago
+              .filter((p) => !tiene.includes(p.id))
+              .map((p) => (
+                <Bloqueado key={p.id} texto={p.nombre} onPress={() => router.push({ pathname: '/tienda', params: { sel: p.id } })} />
+              ))}
             <Etiqueta>Color de arriba</Etiqueta>
             <Muestras colores={COLORES.camisa} valor={a.camisa} onCambio={(c) => set('camisa', c)} />
             <Etiqueta>Parte de abajo</Etiqueta>
@@ -105,19 +91,26 @@ export default function Creador() {
             <Etiqueta>Color de zapatos</Etiqueta>
             <Muestras colores={COLORES.colorZapatos} valor={a.colorZapatos} onCambio={(c) => set('colorZapatos', c)} />
             <Etiqueta>Disfraz (va encima de tu ropa)</Etiqueta>
-            {tieneDino ? (
+            {misDisfraces.length > 0 && (
               <>
-                <Opciones items={[['ninguno', 'Ninguno'], ['dino', 'Dino']]} valor={a.disfraz ?? 'ninguno'} onCambio={(v) => set('disfraz', v)} />
-                {a.disfraz === 'dino' && (
+                <Opciones<Disfraz>
+                  items={[['ninguno', 'Ninguno'], ...misDisfraces.map((p) => [p.val as Disfraz, p.nombre] as [Disfraz, string])]}
+                  valor={a.disfraz ?? 'ninguno'}
+                  onCambio={(v) => set('disfraz', v)}
+                />
+                {a.disfraz && a.disfraz !== 'ninguno' && (
                   <>
-                    <Etiqueta>Color del dino</Etiqueta>
+                    <Etiqueta>{a.disfraz === 'pinguino' ? 'Color de la bufanda' : 'Color del dino'}</Etiqueta>
                     <Muestras colores={COLORES.colorDisfraz} valor={a.colorDisfraz} onCambio={(c) => set('colorDisfraz', c)} />
                   </>
                 )}
               </>
-            ) : (
-              <Bloqueado texto="Disfraz de dino" onPress={() => router.push('/tienda')} />
             )}
+            {disfraces
+              .filter((p) => !tiene.includes(p.id))
+              .map((p) => (
+                <Bloqueado key={p.id} texto={`Disfraz de ${p.nombre.toLowerCase()}`} onPress={() => router.push({ pathname: '/tienda', params: { sel: p.id } })} />
+              ))}
           </>
         )}
         {tab === 'extras' && (
@@ -145,6 +138,40 @@ export default function Creador() {
       </View>
     </SafeAreaView>
   );
+}
+
+/** Partes de arriba que puede elegir: las gratis y las de pago que ya compró (las demás salen con candado). */
+function partesDeArriba(tiene: string[]): [CamisaTipo, string][] {
+  const corto: Record<string, string> = { sudadera: 'Sudadera', mezclilla: 'Mezclilla' };
+  return [
+    ['chaqueta', 'Chaqueta'],
+    ['blusa', 'Blusa'],
+    ...PRENDAS.filter((p) => p.slot === 'camisaTipo' && p.precio > 0 && tiene.includes(p.id)).map((p) => [p.val as CamisaTipo, corto[p.id] ?? p.nombre] as [CamisaTipo, string]),
+  ];
+}
+
+/** Avatar al azar con lo que tiene (fuera del componente: Math.random no puede ir en el render). */
+function avatarAlAzar(tiene: string[]): AvatarConfig {
+  const r = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
+  const col = (k: string) => r(COLORES[k])[0];
+  return {
+    cuerpo: Math.random() < 0.5 ? 'hombre' : 'mujer',
+    piel: col('piel'),
+    colorOjos: col('colorOjos'),
+    pelo: r(['corto', 'largo', 'ninguno'] as const),
+    colorPelo: col('colorPelo'),
+    camisaTipo: r(partesDeArriba(tiene).map(([v]) => v)),
+    camisa: col('camisa'),
+    pantalonTipo: r(['jeans', 'falda'] as const),
+    pantalon: col('pantalon'),
+    zapatos: r(['tenis', 'zapatos'] as const),
+    colorZapatos: col('colorZapatos'),
+    lentes: tiene.includes('lentes') && Math.random() < 0.4 ? 'si' : 'no',
+    audifonos: tiene.includes('audifonos') && Math.random() < 0.4 ? 'si' : 'no',
+    colorAcc: col('colorAcc'),
+    disfraz: Math.random() < 0.2 ? r(['ninguno', ...PRENDAS.filter((p) => p.slot === 'disfraz' && tiene.includes(p.id)).map((p) => p.val as Disfraz)]) : 'ninguno',
+    colorDisfraz: col('colorDisfraz'),
+  };
 }
 
 function Bloqueado({ texto, onPress }: { texto: string; onPress: () => void }) {

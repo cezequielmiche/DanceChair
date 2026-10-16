@@ -9,7 +9,7 @@ import { efecto, musicaOff, musicaOn, prepararAudio } from '@/audio/sonidos';
 import { Avatar3D } from '@/avatar/Avatar3D';
 import { paso as datosPaso } from '@/data/catalogo';
 import { aplicarPartida, esperaConsulta, Reloj } from '@/game/enLinea';
-import { Juego, type Dificultad } from '@/game/juego';
+import { Juego, PAUSA_PERDER, type Dificultad } from '@/game/juego';
 import { type ModoPartida } from '@/game/modo';
 import * as api from '@/lib/api';
 import { salaGuardada } from '@/lib/salaActual';
@@ -23,8 +23,10 @@ import { useJugador } from '@/store/jugador';
 
 export default function PantallaJuego() {
   'use no memo'; // se anima cada cuadro: fuera del React Compiler
-  const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad; modo?: ModoPartida; sala?: string }>();
+  // ver: id del amigo cuya partida se está mirando (sin jugar)
+  const params = useLocalSearchParams<{ jugadores?: string; dificultad?: Dificultad; modo?: ModoPartida; sala?: string; ver?: string }>();
   const modo: ModoPartida = params.modo === 'linea' ? 'linea' : 'bots';
+  const observador = !!params.ver;
   const { avatar, favoritos, registrarPartida, silencio: mudo, setSilencio } = useJugador();
   const { width } = useWindowDimensions();
   const favPasos = useMemo(() => favoritos.map((f) => (f ? datosPaso(f) ?? null : null)), [favoritos]);
@@ -33,11 +35,14 @@ export default function PantallaJuego() {
     // en línea: los otros jugadores de la sala, con su nombre y avatar; los bots salen de la semilla de la sala
     // (así tienen el mismo nombre en todos los teléfonos) y todo lo demás lo decide el servidor
     const sala = salaGuardada(params.sala);
+    // al mirar la partida de un amigo, "tú" es él: se ve desde su lugar
+    const yo = sala?.jugadores.find((j) => j.tu);
     return new Juego({
       jugadores: sala ? sala.jugadores.length + sala.bots : Number(params.jugadores ?? 6),
       dificultad: params.dificultad ?? 'Normal',
-      tuNombre: 'Tú',
-      tuAvatar: avatar,
+      tuNombre: observador && yo ? yo.nombre : 'Tú',
+      tuAvatar: observador && yo ? ({ ...AVATAR_DEFAULT, ...yo.avatar } as AvatarConfig) : avatar,
+      observador,
       favoritos,
       automatico: params.modo === 'linea',
       remoto: !!sala,
@@ -79,7 +84,7 @@ export default function PantallaJuego() {
         efecto('ganaste');
       }
       if (e === 'fuera' || e === 'fin') musicaOff();
-      if ((e === 'ganaste' || (e === 'fuera' && g.fase === 'fin')) && !guardada.current) {
+      if ((e === 'ganaste' || (e === 'fuera' && g.fase === 'fin')) && !guardada.current && !g.observador) {
         guardada.current = true;
         registrarPartida(g.resumen(), modo, params.sala).then(setCobro);
       }
@@ -115,7 +120,7 @@ export default function PantallaJuego() {
     const consultar = async () => {
       const antes = performance.now();
       try {
-        const e = await api.estadoPartida(sala);
+        const e = await (observador ? api.verPartida(sala) : api.estadoPartida(sala));
         if (!vivo) return;
         const despues = performance.now();
         reloj.current.medir(e.ahora, antes, despues);
@@ -140,15 +145,16 @@ export default function PantallaJuego() {
   const tu = g.tu;
   const sentado = !!g.reclamos[0];
   const castigado = ahora < g.adelantoHasta;
-  const puedeSentarse = g.fase === 'alto' && !sentado && tu.vivo && !castigado;
+  const puedeSentarse = g.fase === 'alto' && !sentado && tu.vivo && !castigado && !observador;
   // con la música sonando el botón se ve apagado pero sí recibe toques (para castigar la salida en falso)
   const tocaAntes = g.fase === 'musica' && tu.vivo && !g.espectando;
   const bailando = g.fase === 'musica' && ahora < g.baileHasta;
-  const puedeBailar = g.fase === 'musica' && tu.vivo && !bailando;
+  const puedeBailar = g.fase === 'musica' && tu.vivo && !bailando && !observador;
   const vivos = g.jugadores.filter((p) => p.vivo).length;
   const geoN = g.enRonda.length;
 
   const otraVez = () => {
+    if (observador) return router.back();
     // en línea, otra partida es otra sala
     if (params.sala) return router.replace('/sala');
     guardada.current = false;
@@ -165,8 +171,8 @@ export default function PantallaJuego() {
   let fondo = C.tarjeta;
   let tinta = C.texto;
   if (g.fase === 'cuenta') {
-    titulo = `Empieza en ${Math.max(1, g.cuenta)}…`;
-    msg = 'Cuando pare la música, toca Sentarse.';
+    titulo = observador ? `Partida de ${tu.nombre}` : `Empieza en ${Math.max(1, g.cuenta)}…`;
+    msg = observador ? 'Solo miras: no puedes sentarte ni bailar.' : 'Cuando pare la música, toca Sentarse.';
     fondo = C.amarillo;
     tinta = C.fondo;
   } else if (g.fase === 'musica') {
@@ -184,6 +190,11 @@ export default function PantallaJuego() {
     if (g.gano) {
       titulo = `¡Campeón! +${premio}`;
       msg = ganadas && modo === 'linea' ? `Fuiste el último con silla. +${ganadas} monedas.` : 'Fuiste el último con silla.';
+      fondo = C.amarillo;
+      tinta = C.fondo;
+    } else if (observador) {
+      titulo = `¡${g.ganador} ganó!`;
+      msg = `Terminó la partida de ${tu.nombre}.`;
       fondo = C.amarillo;
       tinta = C.fondo;
     } else if (g.espectando) {
@@ -206,7 +217,7 @@ export default function PantallaJuego() {
   useEffect(() => {
     if (faltaRonda > 0) efecto('pitido');
   }, [faltaRonda]);
-  const accion = g.fase === 'resultado' && !g.espectando && !enEspera && !g.remoto ? 'Siguiente' : g.fase === 'fin' ? 'Otra vez' : '';
+  const accion = g.fase === 'resultado' && !g.espectando && !enEspera && !g.remoto ? 'Siguiente' : g.fase === 'fin' ? (observador ? 'Salir' : 'Otra vez') : '';
   const centroOn = !!accion || puedeSentarse;
   const pulso = puedeSentarse ? (Math.sin(ahora / 140) + 1) / 2 : 0;
   const tamRueda = Math.min(246, width - 2 * 64);
@@ -215,10 +226,12 @@ export default function PantallaJuego() {
   const alCentro = () => {
     if (g.fase === 'resultado') g.siguiente(performance.now());
     else if (g.fase === 'fin') otraVez();
-    else if (g.sentarse(performance.now()) && g.remoto && params.sala) {
-      // en línea vale la hora en que llega al servidor; la respuesta ya trae cómo quedó la ronda
+    else {
+      const toque = performance.now();
+      if (!g.sentarse(toque) || !g.remoto || !params.sala) return;
+      // en línea vale la hora del toque (en el reloj del servidor); la respuesta ya trae cómo quedó la ronda
       api
-        .reclamarSilla(params.sala, g.ronda)
+        .reclamarSilla(params.sala, g.ronda, reloj.current.medido ? reloj.current.servidor(toque) : undefined)
         .then((e) => aplicarPartida(g, e, reloj.current, performance.now()))
         .catch(() => {});
     }
@@ -228,7 +241,8 @@ export default function PantallaJuego() {
   const porLado = Math.ceil(g.jugadores.length / 2);
   const lados = [g.jugadores.slice(0, porLado), g.jugadores.slice(porLado)];
 
-  const perdiste = g.fase === 'fin' && !g.gano && !g.espectando;
+  // el aviso de que perdiste espera unos segundos: primero se ve quién llegó a la silla
+  const perdiste = g.fase === 'fin' && !g.gano && !g.espectando && ahora - g.finEn > PAUSA_PERDER;
 
   return (
     <SafeAreaView style={styles.pantalla} edges={['top', 'bottom']}>
@@ -274,10 +288,12 @@ export default function PantallaJuego() {
           {g.espectando && g.fase !== 'fin' ? (
             <View style={styles.chip}>
               <Ojo size={16} color={C.texto2} />
-              <Text style={styles.chipTxt}>Espectando</Text>
+              <Text style={styles.chipTxt}>{observador ? `Viendo a ${tu.nombre}` : 'Espectando'}</Text>
             </View>
           ) : (
-            <Text style={styles.stat}>{g.fase === 'cuenta' ? `${g.total} jugadores${modo === 'bots' ? ' · contra bots' : ''}` : `Ronda ${g.ronda} · ${vivos} en juego · ${premio}`}</Text>
+            <Text style={styles.stat}>
+              {g.fase === 'cuenta' ? `${g.total} jugadores${modo === 'bots' ? ' · contra bots' : ''}` : `Ronda ${g.ronda} · ${vivos} en juego${observador ? '' : ` · ${premio}`}`}
+            </Text>
           )}
           {ahora < g.flashHasta ? (
             <View style={[styles.chip, { backgroundColor: g.flashMal ? C.errorFondo : C.turquesaFondo }]}>

@@ -2,10 +2,10 @@
 
 export type Cuerpo = 'hombre' | 'mujer';
 export type Pelo = 'corto' | 'largo' | 'ninguno';
-export type CamisaTipo = 'chaqueta' | 'blusa';
+export type CamisaTipo = 'chaqueta' | 'blusa' | 'sudadera' | 'mezclilla';
 export type PantalonTipo = 'jeans' | 'falda';
 export type ZapatosTipo = 'tenis' | 'zapatos';
-export type Disfraz = 'ninguno' | 'dino';
+export type Disfraz = 'ninguno' | 'dino' | 'pinguino';
 export type SiNo = 'si' | 'no';
 
 export interface AvatarConfig {
@@ -23,7 +23,7 @@ export interface AvatarConfig {
   lentes?: SiNo;
   audifonos?: SiNo;
   colorAcc?: string; // color de los audífonos
-  disfraz?: Disfraz; // va encima de la ropa: esconde pantalón y zapatos
+  disfraz?: Disfraz; // va encima de la ropa: esconde pantalón y zapatos (el pingüino también pelo y camisa)
   colorDisfraz?: string;
 }
 

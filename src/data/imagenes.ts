@@ -3,6 +3,8 @@
 export const IMAGEN_ARTICULO: Record<string, number> = {
   chaqueta: require('../../assets/images/tienda/chaqueta.png'),
   blusa: require('../../assets/images/tienda/blusa.png'),
+  sudadera: require('../../assets/images/tienda/sudadera.png'),
+  mezclilla: require('../../assets/images/tienda/mezclilla.png'),
   jeans: require('../../assets/images/tienda/jeans.png'),
   falda: require('../../assets/images/tienda/falda.png'),
   tenis: require('../../assets/images/tienda/tenis.png'),
@@ -10,6 +12,7 @@ export const IMAGEN_ARTICULO: Record<string, number> = {
   lentes: require('../../assets/images/tienda/lentes.png'),
   audifonos: require('../../assets/images/tienda/audifonos.png'),
   dino: require('../../assets/images/tienda/dino.png'),
+  pinguino: require('../../assets/images/tienda/pinguino.png'),
   brazos: require('../../assets/images/tienda/brazos.png'),
   balanceo: require('../../assets/images/tienda/balanceo.png'),
   disco: require('../../assets/images/tienda/disco.png'),

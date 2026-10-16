@@ -215,3 +215,84 @@ test('consulta cada 2 s lejos del alto, cada segundo cerca y cada 250 ms en el a
   assert.equal(esperaConsulta(g, e, r, 8100), 250);
   assert.equal(esperaConsulta(g, { ...e, estado: 'terminada' }, r, 9000), 1000);
 });
+
+function observando() {
+  return new Juego({
+    jugadores: 4,
+    dificultad: 'Normal',
+    tuNombre: 'Ana',
+    tuAvatar: AVATAR_DEFAULT,
+    favoritos: [null, null, null, null],
+    automatico: true,
+    remoto: true,
+    observador: true,
+    tuClave: 'ana',
+    rivales: [{ nombre: 'Leo', avatar: AVATAR_DEFAULT, clave: 'leo' }],
+    random: () => 0.5,
+  });
+}
+
+test('mirar la partida de un amigo a la mitad: se pone al día y no deja jugar', () => {
+  const g = observando();
+  const r = reloj();
+  g.iniciar(0);
+  assert.equal(g.espectando, true);
+  // ya van en la ronda 3: un bot salió en la 1 y el amigo (Ana) en la 2
+  const e = estado({ ronda: 3, inicio: 500, alto: 4000, vivos: ['leo', 'bot2'], fuera: [{ quien: 'bot1', ronda: 1 }, { quien: 'ana', ronda: 2 }] });
+  aplicarPartida(g, e, r, 0);
+  assert.equal(g.tu.vivo, false);
+  assert.notEqual(g.fase, 'fin');
+  assert.equal(g.jugadores.filter((p) => p.vivo).length, 2);
+  avanzar(g, 0, 600);
+  assert.equal(g.fase, 'musica');
+  assert.equal(g.ronda, 3);
+  assert.equal(g.bailar('brazos', 700), false);
+  avanzar(g, 600, 4100);
+  assert.equal(g.fase, 'alto');
+  assert.equal(g.sentarse(4100), false);
+  // el servidor cierra: ganó Leo
+  aplicarPartida(g, estado({ estado: 'terminada', ronda: 3, inicio: 500, alto: 4000, vivos: ['leo'], ganador: 'leo', fuera: [...e.fuera, { quien: 'bot2', ronda: 3 }] }), r, 4500);
+  assert.equal(g.fase, 'fin');
+  assert.equal(g.gano, false);
+  assert.equal(g.ganador, 'Leo');
+});
+
+test('si el amigo gana, el que mira no sale como campeón', () => {
+  const g = observando();
+  const r = reloj();
+  g.iniciar(0);
+  aplicarPartida(g, estado({ estado: 'terminada', ronda: 3, vivos: ['ana'], ganador: 'ana', fuera: [{ quien: 'bot1', ronda: 1 }, { quien: 'leo', ronda: 2 }, { quien: 'bot2', ronda: 3 }] }), r, 0);
+  assert.equal(g.fase, 'fin');
+  assert.equal(g.gano, false);
+  assert.equal(g.ganador, 'Ana');
+});
+
+test('los bots se sientan en pantalla a la hora que decidió el servidor', () => {
+  const g = nuevo();
+  const r = reloj();
+  g.iniciar(0);
+  const e = estado({ bots_llegan: [{ quien: 'bot2', hora: 8500 }, { quien: 'bot1', hora: 8200 }] });
+  aplicarPartida(g, e, r, 0);
+  avanzar(g, 0, 8100);
+  assert.equal(g.fase, 'alto');
+  const id = (c: string) => g.jugadores.find((p) => p.clave === c)!.id;
+  assert.equal(g.reclamos[id('bot1')], undefined);
+  avanzar(g, 8100, 8250);
+  assert.ok(g.reclamos[id('bot1')]);
+  assert.equal(g.reclamos[id('bot2')], undefined);
+  assert.ok(g.sentarse(8300)); // tú, antes que bot2
+  avanzar(g, 8250, 8520);
+  assert.ok(g.reclamos[id('bot2')]);
+  assert.equal(g.reclamos[id('ana')], undefined); // la última silla ya se ocupó: Ana se queda parada
+});
+
+test('si los bots ya ocuparon las sillas, tocar tarde no te sienta en pantalla', () => {
+  const g = nuevo();
+  const r = reloj();
+  g.iniciar(0);
+  aplicarPartida(g, estado({ bots_llegan: [{ quien: 'bot1', hora: 8100 }, { quien: 'bot2', hora: 8200 }] }), r, 0);
+  avanzar(g, 0, 8050);
+  g.reclamoRemoto('ana', 8050);
+  avanzar(g, 8050, 8300);
+  assert.equal(g.sentarse(8400), false);
+});

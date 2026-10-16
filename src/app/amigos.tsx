@@ -1,7 +1,7 @@
 // Amigos (desde el ícono del inicio): arriba las solicitudes que te mandaron (aceptar o rechazar), luego los
 // amigos conectados y los desconectados, y al final las solicitudes que mandaste (pendientes).
 // Con el buscador se encuentran jugadores por nombre para mandarles solicitud. Mantener presionado un amigo
-// lo quita; una solicitud pendiente, la cancela.
+// lo quita; una solicitud pendiente, la cancela. Si un amigo conectado está en una partida, se puede ver.
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AVATAR_DEFAULT } from '@/avatar/types';
 import * as api from '@/lib/api';
+import { guardarSala } from '@/lib/salaActual';
 import { useJugador } from '@/store/jugador';
 import { Boton, Etiqueta, MiniAvatar } from '@/ui/comunes';
 import { Flecha } from '@/ui/iconos';
@@ -125,6 +126,24 @@ export default function Amigos() {
       },
     ]);
 
+  // mirar la partida de un amigo: la pantalla del juego la muestra desde su lugar, sin jugar
+  const [abriendo, setAbriendo] = useState('');
+  const verPartida = (a: api.Amigo) => {
+    if (!a.sala || abriendo) return;
+    setAbriendo(a.id);
+    api
+      .verSala(a.sala)
+      .then((s) => {
+        guardarSala({ ...s, jugadores: s.jugadores.map((j) => ({ ...j, tu: j.user_id === a.id })) });
+        router.push({ pathname: '/juego', params: { modo: 'linea', dificultad: s.dificultad, sala: s.id, ver: a.id } });
+      })
+      .catch((e) => {
+        Alert.alert('No se pudo abrir la partida', (e as Error).message);
+        cargar();
+      })
+      .finally(() => setAbriendo(''));
+  };
+
   const conectados = amigos?.filter((a) => a.conectado) ?? [];
   const desconectados = amigos?.filter((a) => !a.conectado) ?? [];
   const recibidas = solicitudes.filter((x) => x.tipo === 'recibida');
@@ -233,7 +252,7 @@ export default function Amigos() {
                 <Etiqueta style={styles.seccion}>Conectados · {conectados.length}</Etiqueta>
                 {conectados.length === 0 ? <Text style={styles.vacioChico}>Ninguno ahora.</Text> : null}
                 {conectados.map((a) => (
-                  <FilaAmigo key={a.id} amigo={a} onQuitar={() => quitar(a)} />
+                  <FilaAmigo key={a.id} amigo={a} onQuitar={() => quitar(a)} onVer={() => verPartida(a)} abriendo={abriendo === a.id} />
                 ))}
                 <Etiqueta style={styles.seccion}>Desconectados · {desconectados.length}</Etiqueta>
                 {desconectados.length === 0 ? <Text style={styles.vacioChico}>Todos están conectados.</Text> : null}
@@ -267,8 +286,9 @@ export default function Amigos() {
   );
 }
 
-function FilaAmigo({ amigo, onQuitar }: { amigo: api.Amigo; onQuitar: () => void }) {
+function FilaAmigo({ amigo, onQuitar, onVer, abriendo }: { amigo: api.Amigo; onQuitar: () => void; onVer?: () => void; abriendo?: boolean }) {
   const av = { ...AVATAR_DEFAULT, ...amigo.avatar };
+  const jugando = amigo.conectado && !!amigo.sala;
   return (
     <Pressable onLongPress={onQuitar} accessibilityHint="Mantén presionado para quitarlo de tus amigos" style={[styles.fila, !amigo.conectado && { opacity: 0.75 }]}>
       <View>
@@ -279,8 +299,13 @@ function FilaAmigo({ amigo, onQuitar }: { amigo: api.Amigo; onQuitar: () => void
         <Text style={styles.nombre} numberOfLines={1}>
           {amigo.nombre}
         </Text>
-        <Text style={styles.estado}>{amigo.conectado ? 'Conectado' : haceCuanto(amigo.visto)}</Text>
+        <Text style={[styles.estado, jugando && { color: C.turquesa }]}>{jugando ? 'Jugando una partida' : amigo.conectado ? 'Conectado' : haceCuanto(amigo.visto)}</Text>
       </View>
+      {jugando && onVer ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`Ver la partida de ${amigo.nombre}`} onPress={onVer} disabled={abriendo} style={styles.agregar}>
+          {abriendo ? <ActivityIndicator color={C.fondo} /> : <Text style={styles.agregarTxt}>Ver partida</Text>}
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }

@@ -24,6 +24,11 @@ export class Reloj {
   local(servidor: number) {
     return servidor + this.desfase;
   }
+
+  /** Hora local (performance.now()) pasada al reloj del servidor. */
+  servidor(local: number) {
+    return local - this.desfase;
+  }
 }
 
 /**
@@ -36,6 +41,8 @@ export function aplicarPartida(g: Juego, e: EstadoPartida, reloj: Reloj, ahora: 
   for (const r of sentados) g.reclamoRemoto(r.quien, ahora);
   for (const f of e.fuera) g.resolverRonda(f.quien, ahora);
   if (e.estado === 'jugando' && e.inicio != null && e.alto != null) g.programarRonda(e.ronda, reloj.local(e.inicio), reloj.local(e.alto), ahora);
+  // los bots se sientan en pantalla a la hora que ya decidió el servidor (no cuando llega la siguiente consulta)
+  if (e.estado === 'jugando' && e.bots_llegan) g.llegadasBots(e.ronda, e.bots_llegan.map((b) => ({ clave: b.quien, en: reloj.local(b.hora) })));
 }
 
 /**

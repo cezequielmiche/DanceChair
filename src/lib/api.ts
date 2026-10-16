@@ -237,6 +237,8 @@ export interface EstadoPartida {
   reclamos: { quien: string; hora: number }[];
   /** Quiénes se sentaron en la ronda anterior (sin el que quedó fuera), por si la ronda se cerró entre consultas. */
   anteriores?: { quien: string; hora: number }[];
+  /** Cuándo llega cada bot en la ronda actual (ya decidido aunque no haya pasado). */
+  bots_llegan?: { quien: string; hora: number }[];
 }
 
 /** Cómo va la partida. Si ya toca cerrar la ronda, el servidor la cierra al consultar. */
@@ -246,9 +248,26 @@ export async function estadoPartida(sala: string): Promise<EstadoPartida> {
   return data as EstadoPartida;
 }
 
-/** Sentarse: el servidor anota la hora en que llega. */
-export async function reclamarSilla(sala: string, ronda: number): Promise<EstadoPartida> {
-  const { data, error: e } = await sb().rpc('reclamar_silla', { p_sala: sala, p_ronda: ronda });
+/**
+ * Sentarse. `hora`: cuándo tocaste, en el reloj del servidor (ms); el servidor la acepta si no es de más de
+ * 250 ms antes de que llegue el aviso (así el retraso de internet no cuenta en tu contra).
+ */
+export async function reclamarSilla(sala: string, ronda: number, hora?: number): Promise<EstadoPartida> {
+  const { data, error: e } = await sb().rpc('reclamar_silla', { p_sala: sala, p_ronda: ronda, ...(hora != null ? { p_hora: Math.round(hora) } : {}) });
+  if (e) throw error(e);
+  return data as EstadoPartida;
+}
+
+/** La sala de la partida de un amigo, para mirarla (nadie sale como "tú"). */
+export async function verSala(sala: string): Promise<EstadoSala> {
+  const { data, error: e } = await sb().rpc('ver_sala', { p_sala: sala });
+  if (e) throw error(e);
+  return data as EstadoSala;
+}
+
+/** Cómo va la partida de un amigo (como estadoPartida, pero solo para mirar). */
+export async function verPartida(sala: string): Promise<EstadoPartida> {
+  const { data, error: e } = await sb().rpc('ver_partida', { p_sala: sala });
   if (e) throw error(e);
   return data as EstadoPartida;
 }
@@ -261,6 +280,8 @@ export interface Amigo {
   conectado: boolean;
   /** Último latido (null si nunca abrió la app con esta versión). */
   visto: string | null;
+  /** Sala en la que está jugando ahora (para ver su partida), o null. */
+  sala: string | null;
 }
 
 export interface JugadorEncontrado {

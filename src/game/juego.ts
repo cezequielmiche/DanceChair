@@ -42,6 +42,11 @@ export interface Opciones {
   remoto?: boolean;
   /** En línea: tu user_id. */
   tuClave?: string;
+  /**
+   * Solo mirar la partida de un amigo: "tú" es el amigo (su nombre, avatar y clave), no se puede sentar ni
+   * bailar, y cuando queda fuera la partida sigue mostrándose hasta el final.
+   */
+  observador?: boolean;
   random?: () => number;
 }
 
@@ -56,6 +61,8 @@ export interface Geometria {
 // Medidas de la pista (metros): los jugadores giran en un círculo de 2 m alrededor de las sillas.
 export const RADIO_ORBITA = 2;
 const radioSillas = (C: number) => (C === 1 ? 0 : C === 2 ? 0.74 : 1.185);
+/** Al quedar fuera, el aviso "¡Te quedaste sin silla!" espera esto (ms) para que se vea quién se sentó. */
+export const PAUSA_PERDER = 3000;
 /** El ganador baila sus 3 pasos al final (ms desde que termina la partida); luego se queda quieto. */
 const FIN_BAILE = 500 + 3 * 3400;
 /** En línea: espera entre el resultado de una ronda y la siguiente (ms). */
@@ -115,6 +122,8 @@ export class Juego {
   private oyentes: ((e: Evento) => void)[] = [];
   /** En línea: la última ronda que mandó el servidor (horas en el reloj local). */
   private prog: { ronda: number; inicio: number; alto: number } | null = null;
+  /** En línea: a qué hora (local) llega cada bot a su silla en la ronda, según el servidor. */
+  private llegadas: { ronda: number; lista: { clave: string; en: number }[] } | null = null;
 
   constructor(opts: Opciones) {
     this.opts = opts;
@@ -130,6 +139,9 @@ export class Juego {
   }
   get remoto() {
     return !!this.opts.remoto;
+  }
+  get observador() {
+    return !!this.opts.observador;
   }
 
   on(fn: (e: Evento) => void) {
@@ -177,7 +189,8 @@ export class Juego {
     this.personasFuera = 0;
     this.rondaFuera = 0;
     this.gano = false;
-    this.espectando = false;
+    this.espectando = !!this.opts.observador;
+    this.llegadas = null;
     this.ganadorId = null;
     this.ganador = '';
     this.ultimoFuera = '';
@@ -290,6 +303,7 @@ export class Juego {
 
   /** Botón Sentarse. Si la música aún suena, es una salida en falso: te deja sin poder sentarte un rato. */
   sentarse(ahora: number) {
+    if (this.opts.observador) return false;
     if (this.fase === 'musica' && this.tu.vivo && !this.espectando) {
       this.adelantoHasta = ahora + CASTIGO_ADELANTO;
       this.flash = '¡Te adelantaste!';
@@ -304,6 +318,7 @@ export class Juego {
 
   /** Tocar un paso de la rueda mientras suena la música (suma estilo: puntos y monedas). */
   bailar(id: DanceId, ahora: number) {
+    if (this.opts.observador) return false;
     if (this.fase !== 'musica' || !this.tu.vivo || ahora < this.baileHasta) return false;
     this.baile = id;
     this.baileHasta = ahora + (datosPaso(id)?.dura ?? 1700);
@@ -327,9 +342,16 @@ export class Juego {
       this.rondasSobrevividas++;
     }
     const vivos = this.jugadores.filter((p) => p.vivo);
-    if (perdedor.tu) {
+    if (perdedor.tu && !this.opts.observador) {
       this.rondaFuera = this.ronda;
       this.fase = 'fin';
+      // sin esto la pista se quedaba congelada al instante (quieto) y no se veía quién te ganó la silla
+      this.finEn = ahora;
+      if (vivos.length === 1) {
+        // última ronda: el otro ganó y baila su festejo
+        this.ganador = vivos[0].nombre;
+        this.ganadorId = vivos[0].id;
+      }
       this.gano = false;
       this.puesto = vivos.length + 1;
       this.emitir('fuera');
@@ -338,7 +360,7 @@ export class Juego {
       this.ganador = vivos[0].nombre;
       this.ganadorId = vivos[0].id;
       this.finEn = ahora;
-      if (vivos[0].tu) {
+      if (vivos[0].tu && !this.opts.observador) {
         this.gano = true;
         this.puesto = 1;
         this.emitir('ganaste');
@@ -415,6 +437,12 @@ export class Juego {
     this.version++;
   }
 
+  /** En línea: cuándo llega cada bot en la ronda (hora local, ya ordenadas por el servidor). */
+  llegadasBots(ronda: number, lista: { clave: string; en: number }[]) {
+    if (!this.opts.remoto || ronda < this.ronda) return;
+    this.llegadas = { ronda, lista: [...lista].sort((a, b) => a.en - b.en) };
+  }
+
   /** Alguien llegó a su silla según el servidor (los tuyos ya se ven al tocar Sentarse). */
   reclamoRemoto(clave: string, ahora: number) {
     const p = this.jugadores.find((q) => q.clave === clave);
@@ -473,6 +501,15 @@ export class Juego {
     if (listos.length) {
       this.agenda = this.agenda.filter((e) => e.en > ahora);
       listos.forEach((e) => e.fn(ahora));
+    }
+    // en línea: los bots se sientan a la hora que decidió el servidor (en orden; si ya no hay silla, se quedan parados)
+    const ll = this.llegadas;
+    if (ll && this.fase === 'alto' && ll.ronda === this.ronda) {
+      for (const l of ll.lista) {
+        if (l.en > ahora) break;
+        const p = this.jugadores.find((q) => q.clave === l.clave);
+        if (p && p.vivo && !this.reclamos[p.id]) this.reclamar(p.id, ahora);
+      }
     }
   }
 

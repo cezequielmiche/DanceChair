@@ -35,16 +35,20 @@ export interface Paso {
 
 export type Articulo = Prenda | Paso;
 
+// Rebaja temporal (2026-10-16): pingüino y dino a 300 (normal: 900). Al quitarla, regresar también el precio en Supabase.
 export const PRENDAS: Prenda[] = [
   { id: 'chaqueta', tipo: 'ropa', slot: 'camisaTipo', val: 'chaqueta', nombre: 'Chaqueta', precio: 0, etiqueta: 'Gratis', muestra: '#E54B4B', desc: 'Chaqueta con cierre sobre playera. Cámbiale el color en el creador.' },
   { id: 'blusa', tipo: 'ropa', slot: 'camisaTipo', val: 'blusa', nombre: 'Blusa', precio: 0, etiqueta: 'Gratis', muestra: '#FFFFFF', desc: 'Blusa con mangas abombadas y moño en el cuello.' },
+  { id: 'sudadera', tipo: 'ropa', slot: 'camisaTipo', val: 'sudadera', nombre: 'Sudadera de oso', precio: 500, etiqueta: 'Nuevo', muestra: '#8B5A3C', desc: 'Sudadera con capucha, cordones y una cara de oso al frente. Cámbiale el color en el creador.' },
+  { id: 'mezclilla', tipo: 'ropa', slot: 'camisaTipo', val: 'mezclilla', nombre: 'Chaqueta de mezclilla', precio: 500, etiqueta: 'Nuevo', muestra: '#4E78AE', desc: 'Chaqueta de mezclilla abierta, con bolsas y botones. La playera de abajo lleva el color que elijas.' },
   { id: 'jeans', tipo: 'ropa', slot: 'pantalonTipo', val: 'jeans', nombre: 'Jeans', precio: 0, etiqueta: 'Gratis', muestra: '#2E3B5E', desc: 'Pantalón de mezclilla con dobladillo.' },
   { id: 'falda', tipo: 'ropa', slot: 'pantalonTipo', val: 'falda', nombre: 'Falda', precio: 0, etiqueta: 'Gratis', muestra: '#E54B4B', desc: 'Falda con vuelo y calcetas largas.' },
   { id: 'tenis', tipo: 'ropa', slot: 'zapatos', val: 'tenis', nombre: 'Tenis', precio: 0, etiqueta: 'Gratis', muestra: '#FFC233', desc: 'Tenis con calcetín de franja.' },
   { id: 'zapatos', tipo: 'ropa', slot: 'zapatos', val: 'zapatos', nombre: 'Zapatos', precio: 0, etiqueta: 'Gratis', muestra: '#7FD1FF', desc: 'Zapatos de correa, cómodos para bailar.' },
   { id: 'lentes', tipo: 'ropa', slot: 'lentes', val: 'si', quitar: 'no', nombre: 'Lentes', precio: 200, etiqueta: 'Nuevo', muestra: '#1E1E28', busto: true, desc: 'Lentes redondos. Se ponen y se quitan cuando quieras.' },
   { id: 'audifonos', tipo: 'ropa', slot: 'audifonos', val: 'si', quitar: 'no', nombre: 'Audífonos', precio: 350, etiqueta: 'Popular', muestra: '#F25F9C', busto: true, desc: 'Audífonos de diadema. Elige su color en el creador.' },
-  { id: 'dino', tipo: 'ropa', slot: 'disfraz', val: 'dino', quitar: 'ninguno', nombre: 'Dino', precio: 900, etiqueta: 'Premium', muestra: '#3DBE4A', desc: 'Disfraz inflable: vas montado en un dinosaurio. Se pone encima de tu ropa y le cambias el color en el creador.' },
+  { id: 'pinguino', tipo: 'ropa', slot: 'disfraz', val: 'pinguino', quitar: 'ninguno', nombre: 'Pingüino', precio: 300, etiqueta: 'Premium', muestra: '#23262F', desc: 'Disfraz de pingüino de pies a cabeza: capucha con pico, aletas y patas naranjas. Se pone encima de tu ropa y la bufanda lleva el color que elijas en el creador.' },
+  { id: 'dino', tipo: 'ropa', slot: 'disfraz', val: 'dino', quitar: 'ninguno', nombre: 'Dino', precio: 300, etiqueta: 'Premium', muestra: '#3DBE4A', desc: 'Disfraz inflable: vas montado en un dinosaurio. Se pone encima de tu ropa y le cambias el color en el creador.' },
 ];
 
 export const PASOS: Paso[] = [
@@ -80,7 +84,11 @@ export function llevaPuesta(a: AvatarConfig, p: Prenda): boolean {
 export function soloLoQueTiene(a: AvatarConfig, tiene: string[]): AvatarConfig {
   let out = { ...a };
   PRENDAS.forEach((p) => {
-    if (p.precio > 0 && !tiene.includes(p.id) && llevaPuesta(out, p) && p.quitar) out = { ...out, [p.slot]: p.quitar };
+    if (p.precio > 0 && !tiene.includes(p.id) && llevaPuesta(out, p)) {
+      if (p.quitar) out = { ...out, [p.slot]: p.quitar };
+      // parte de arriba de pago: vuelve a la de su cuerpo (chaqueta o blusa)
+      else if (p.slot === 'camisaTipo') out = { ...out, camisaTipo: undefined };
+    }
   });
   return out;
 }

@@ -45,7 +45,7 @@ const PX_POR_METRO = ALTO_PODIO / 2 / (4.77 * Math.tan((15 * Math.PI) / 180));
 const ANCHO_ETIQUETA = 104;
 
 export default function Inicio() {
-  const { nombre, avatar, monedas, partidas, ultimaGanancia, modo } = useJugador();
+  const { nombre, avatar, monedas, partidas, ultimaGanancia, ultimasMonedas, modo } = useJugador();
   const [tipo, setTipo] = useState<Tipo>('semanal');
   const [anchoPodio, setAnchoPodio] = useState(0);
   const [filas, setFilas] = useState<Fila[] | null>(null);
@@ -136,7 +136,19 @@ export default function Inicio() {
         <View style={styles.tarjeta}>
           <View style={styles.filaEntre}>
             <Text style={styles.etq}>Tus puntos esta semana</Text>
-            {ultimaGanancia > 0 ? <Text style={styles.chip}>+{ultimaGanancia} última partida</Text> : null}
+            {ultimaGanancia > 0 || ultimasMonedas > 0 ? (
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                {ultimaGanancia > 0 ? <Text style={styles.chip}>+{ultimaGanancia} última partida</Text> : null}
+                {ultimasMonedas > 0 ? (
+                  <View style={styles.chipMonedas}>
+                    <Moneda size={13} />
+                    <Text style={styles.chipMonedasTxt}>
+                      +{ultimasMonedas} monedas{ultimaGanancia > 0 ? '' : ' última partida'}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
             <Text style={styles.puntos}>{fmt(modo === 'cuenta' && tipo === 'semanal' && yo ? yo.puntos : semana)}</Text>
@@ -221,6 +233,8 @@ const styles = StyleSheet.create({
   tarjeta: { backgroundColor: C.tarjeta, borderRadius: 20, padding: 16, gap: 6 },
   filaEntre: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   etq: { fontFamily: F.fuerte, fontSize: 13, color: C.apagado },
+  chipMonedas: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.amarilloFondo, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
+  chipMonedasTxt: { fontFamily: F.fuerte, fontSize: 12, color: C.amarillo },
   chip: { fontFamily: F.fuerte, fontSize: 12, color: C.turquesa, backgroundColor: C.turquesaFondo, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, overflow: 'hidden' },
   puntos: { fontFamily: F.titulo, fontSize: 44, lineHeight: 60, color: C.amarillo },
   puesto: { fontFamily: F.fuerte, fontSize: 15, color: C.texto },

@@ -44,6 +44,8 @@ interface Estado {
   /** Monedas ganadas hoy contra bots (tienen tope diario). No se reinicia al cerrar sesión. */
   monedasHoy: { dia: string; n: number };
   ultimaGanancia: number;
+  /** Monedas que dio la última partida (en línea o contra bots). */
+  ultimasMonedas: number;
   cargando: boolean;
   aviso: string;
 
@@ -80,6 +82,7 @@ const INICIAL = {
   dificultad: 'Normal' as Dificultad,
   monedasHoy: { dia: '', n: 0 },
   ultimaGanancia: 0,
+  ultimasMonedas: 0,
   cargando: false,
   aviso: '',
 };
@@ -181,7 +184,7 @@ export const useJugador = create<Estado>()(
           const yaHoy = s.monedasHoy.dia === dia ? s.monedasHoy.n : 0;
           const ganadas = conTopeDiario(r.monedas, yaHoy);
           const pendientes = s.modo === 'cuenta' ? { ...s.monedasPendientes, [dia]: (s.monedasPendientes[dia] ?? 0) + ganadas } : {};
-          set({ monedasHoy: { dia, n: yaHoy + ganadas }, monedas: s.monedas + ganadas, monedasPendientes: pendientes, ultimaGanancia: 0 });
+          set({ monedasHoy: { dia, n: yaHoy + ganadas }, monedas: s.monedas + ganadas, monedasPendientes: pendientes, ultimaGanancia: 0, ultimasMonedas: ganadas });
           // por si se jugó contra bots porque el servidor no respondía y ya volvió
           if (s.modo === 'cuenta') get().subirPendientes();
           return { monedas: ganadas, puntos: 0 };
@@ -195,6 +198,7 @@ export const useJugador = create<Estado>()(
                 monedas: c.monedas_total + sumar(get().monedasPendientes),
                 partidas: [...get().partidas, { puntos: c.puntos, gano: c.gano, fecha: Date.now() }].slice(-200),
                 ultimaGanancia: c.puntos,
+                ultimasMonedas: c.ganadas,
               });
               return { monedas: c.ganadas, puntos: c.puntos };
             } catch (e) {
@@ -207,7 +211,7 @@ export const useJugador = create<Estado>()(
           }
         }
         const ganadas = r.monedas;
-        set({ monedas: s.monedas + ganadas, partidas: [...s.partidas, { puntos: r.puntos, gano: r.gano, fecha: Date.now() }].slice(-200), ultimaGanancia: r.puntos });
+        set({ monedas: s.monedas + ganadas, partidas: [...s.partidas, { puntos: r.puntos, gano: r.gano, fecha: Date.now() }].slice(-200), ultimaGanancia: r.puntos, ultimasMonedas: ganadas });
         return { monedas: ganadas, puntos: r.puntos };
       },
 
@@ -264,6 +268,7 @@ export const useJugador = create<Estado>()(
         dificultad: s.dificultad,
         monedasHoy: s.monedasHoy,
         ultimaGanancia: s.ultimaGanancia,
+        ultimasMonedas: s.ultimasMonedas,
       }),
     },
   ),

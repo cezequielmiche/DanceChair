@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { AVATAR_DEFAULT } from '../src/avatar/types';
-import { CASTIGO_ADELANTO, ESPERA_RONDA, Juego, type Dificultad } from '../src/game/juego';
+import { CASTIGO_ADELANTO, ESPERA_RONDA, Juego, PAUSA_PERDER, type Dificultad } from '../src/game/juego';
 
 // números al azar repetibles
 function semilla(s: number) {
@@ -204,4 +204,21 @@ test('en línea la siguiente ronda arranca sola a los 3 s (sin tocar Siguiente)'
   }
   assert.equal(g.ronda, 2);
   assert.equal(g.siguienteEn, 0);
+});
+
+test('al perder en la última ronda la pista sigue viva para ver quién se sentó y el ganador festeja', () => {
+  const g = nuevo(3, 'Difícil', 11);
+  const t = { v: 0 };
+  g.iniciar(t.v);
+  // gana la primera ronda y pierde la última (no se sienta)
+  hasta(g, t, () => g.fase === 'alto');
+  g.sentarse(t.v);
+  hasta(g, t, () => g.fase === 'resultado');
+  g.siguiente(t.v);
+  hasta(g, t, () => g.fase === 'fin');
+  assert.equal(g.gano, false);
+  assert.equal(g.finEn, t.v);
+  assert.equal(g.quieto(t.v + PAUSA_PERDER), false);
+  assert.notEqual(g.ganadorId, null);
+  assert.equal(g.ganador, g.jugadores.find((p) => p.vivo)?.nombre);
 });

@@ -4,8 +4,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as THREE from 'three';
 
-import { dress } from '../src/avatar/piezas';
-import { AVATAR_CHICA, AVATAR_CHICO } from '../src/avatar/types';
+import { dress, visibility } from '../src/avatar/piezas';
+import { AVATAR_CHICA, AVATAR_CHICO, AVATAR_DEFAULT } from '../src/avatar/types';
+import { GRATIS, soloLoQueTiene } from '../src/data/catalogo';
 
 /** Modelo mínimo: una malla por pieza, con el nombre de material que trae el .glb. */
 function modelo(piezas: Record<string, string>) {
@@ -46,4 +47,28 @@ test('los materiales que no son de color elegible conservan el suyo', () => {
   const m = modelo({ Pant_falda: 'chica_celeste.001' });
   dress(m, AVATAR_CHICA);
   assert.equal(color(m, 'Pant_falda'), '#123456');
+});
+
+test('sudadera y mezclilla: se ven si las llevas y se quitan si no son tuyas', () => {
+  const llaves = ['Camisa_chaqueta', 'Camisa_blusa', 'Camisa_sudadera', 'Camisa_mezclilla'];
+  const v = visibility({ ...AVATAR_DEFAULT, camisaTipo: 'sudadera' }, llaves);
+  assert.equal(v.Camisa_sudadera, true);
+  assert.equal(v.Camisa_chaqueta, false);
+  const sinComprar = soloLoQueTiene({ ...AVATAR_DEFAULT, camisaTipo: 'mezclilla' }, GRATIS);
+  assert.equal(sinComprar.camisaTipo, undefined);
+  assert.equal(visibility(sinComprar, llaves).Camisa_chaqueta, true);
+  assert.equal(soloLoQueTiene({ ...AVATAR_DEFAULT, camisaTipo: 'mezclilla' }, [...GRATIS, 'mezclilla']).camisaTipo, 'mezclilla');
+});
+
+test('el pingüino tapa pelo, ropa, zapatos y audífonos; el dino solo las piernas', () => {
+  const llaves = ['Pelo_corto', 'Camisa_chaqueta', 'Pant_jeans', 'Zap_tenis', 'Acc_lentes', 'Acc_audifonos', 'Disf_dino', 'Disf_pinguino'];
+  const p = visibility({ ...AVATAR_DEFAULT, disfraz: 'pinguino', lentes: 'si', audifonos: 'si' }, llaves);
+  assert.equal(p.Disf_pinguino, true);
+  assert.equal(p.Disf_dino, false);
+  for (const k of ['Pelo_corto', 'Camisa_chaqueta', 'Pant_jeans', 'Zap_tenis', 'Acc_audifonos']) assert.equal(p[k], false, k);
+  assert.equal(p.Acc_lentes, true);
+  const d = visibility({ ...AVATAR_DEFAULT, disfraz: 'dino' }, llaves);
+  assert.equal(d.Camisa_chaqueta, true);
+  assert.equal(d.Pelo_corto, true);
+  assert.equal(d.Pant_jeans, false);
 });

@@ -27,6 +27,11 @@ export function choice(c: AvatarConfig) {
   };
 }
 
+const ESCONDE: Record<string, RegExp> = {
+  dino: /^(Pant|Zap)_/,
+  pinguino: /^(Pant|Zap|Camisa|Pelo)_|^Acc_audifonos/,
+};
+
 /** Visibilidad de las piezas que trae el modelo. Si falta la elegida, se muestra la primera del grupo. */
 export function visibility(c: AvatarConfig, keys: string[]): Record<string, boolean> {
   const ch = choice(c);
@@ -50,9 +55,11 @@ export function visibility(c: AvatarConfig, keys: string[]): Record<string, bool
     const pick = list.includes(want) ? want : list[0];
     list.forEach((k) => (vis[k] = k === pick));
   });
-  // con disfraz, las piernas van dentro de las patas del dino
-  if (ch.Disf !== 'ninguno' && keys.includes(`Disf_${ch.Disf}`))
-    Object.keys(vis).forEach((k) => { if (/^(Pant|Zap)_/.test(k)) vis[k] = false; });
+  // lo que tapa cada disfraz: el dino las piernas; el pingüino es de pies a cabeza (capucha, aletas y patas)
+  if (ch.Disf !== 'ninguno' && keys.includes(`Disf_${ch.Disf}`)) {
+    const tapa = ESCONDE[ch.Disf] ?? ESCONDE.dino;
+    Object.keys(vis).forEach((k) => { if (tapa.test(k)) vis[k] = false; });
+  }
   return vis;
 }
 
